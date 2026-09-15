@@ -1,12 +1,27 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QWindow>
+
+#include "app_launcher.h"
+#include "platform/dock_platform.h"
+#include "shell_icon_provider.h"
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
+    AppLauncher launcher;
+    engine.addImageProvider("shell", new ShellIconProvider);
+    engine.rootContext()->setContextProperty("launcher", &launcher);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
     engine.loadFromModule("Tasked", "Main");
+    if (engine.rootObjects().isEmpty()) return -1;
+    auto *window = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
+    if (!window) return -1;
+    window->setGeometry(tasked::platform::installDock(window, 92));
+    window->show();
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, [] { tasked::platform::uninstallDock(); });
     return app.exec();
 }

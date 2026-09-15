@@ -15,7 +15,7 @@ The primary target is taskbar replacement, not a floating toolbar. On Windows, T
 
 ## Current state
 
-The repository currently contains a static Qt Quick smoke host. It verifies that Tasked can link against the static Qt 6.8.3 toolchain without Qt or compiler runtime DLLs beside the executable. Dock behavior, Explorer taskbar replacement, and extensions are not implemented yet.
+The repository currently contains a static Qt Quick host with a Windows AppBar reservation, a three-section bottom dock layout, native executable icons, and basic launchers. The Explorer taskbar remains visible while replacement behavior is validated; Tasked does not hide it yet.
 
 ## Build
 
