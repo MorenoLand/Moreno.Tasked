@@ -6,6 +6,7 @@
 #include <QWindow>
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <shellapi.h>
 #include "resources/resource.h"
 #endif
 
@@ -59,9 +60,9 @@ int main(int argc, char *argv[])
     window->show();
 #ifdef Q_OS_WIN
     const auto nativeWindow = reinterpret_cast<HWND>(window->winId());
-    const auto module = GetModuleHandleW(nullptr);
-    const auto largeIcon = reinterpret_cast<HICON>(LoadImageW(module, MAKEINTRESOURCEW(IDI_TASKED_ICON), IMAGE_ICON, 32, 32, LR_DEFAULTSIZE));
-    const auto smallIcon = reinterpret_cast<HICON>(LoadImageW(module, MAKEINTRESOURCEW(IDI_TASKED_ICON), IMAGE_ICON, 16, 16, LR_DEFAULTSIZE));
+    HICON largeIcon = nullptr;
+    HICON smallIcon = nullptr;
+    ExtractIconExW(reinterpret_cast<LPCWSTR>(QCoreApplication::applicationFilePath().utf16()), 0, &largeIcon, &smallIcon, 1);
     if (largeIcon) SendMessageW(nativeWindow, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(largeIcon));
     if (smallIcon) SendMessageW(nativeWindow, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(smallIcon));
 #endif
