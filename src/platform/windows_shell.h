@@ -18,6 +18,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     Q_INVOKABLE void activate(const QString &windowHandle);
     Q_INVOKABLE void close(const QString &windowHandle);
+    Q_INVOKABLE void move(int from, int to);
 private:
     void refresh();
     QVector<Item> items;

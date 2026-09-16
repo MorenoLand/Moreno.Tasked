@@ -120,6 +120,7 @@ Window {
                 spacing: 10
 
                 ListView {
+                    id: runningList
                     width: parent.width
                     height: 66
                     clip: true
@@ -130,14 +131,17 @@ Window {
                     add: Transition { NumberAnimation { properties: "x,opacity"; from: 16; to: 0; duration: 220; easing.type: Easing.OutCubic } }
                     displaced: Transition { NumberAnimation { properties: "x"; duration: 180; easing.type: Easing.InOutCubic } }
                     delegate: Item {
+                        id: runningDelegate
                         width: 60
                         height: 66
+                        property bool dragged: false
                         Rectangle {
                             id: runningIcon
                             width: 42
                             height: 42
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.top: parent.top
+                            anchors.topMargin: 6
                             radius: 12
                             color: "#31446F"
                             opacity: runningMouse.containsMouse ? 1 : 0.94
@@ -148,8 +152,19 @@ Window {
                             Text { anchors.centerIn: parent; text: model.title.charAt(0); color: "#F3F6FF"; font.pixelSize: 17; font.bold: true; visible: runningImage.status !== Image.Ready }
                             Rectangle { width: 20; height: 3; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; radius: 2; color: model.active ? "#79B7FF" : "transparent" }
                         }
-                        Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: -1; width: 60; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.pixelSize: 9 }
-                        MouseArea { id: runningMouse; anchors.fill: parent; hoverEnabled: true; onClicked: runningApps.activate(model.windowHandle) }
+                        Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; width: 60; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.pixelSize: 9 }
+                        MouseArea {
+                            id: runningMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            drag.target: runningDelegate
+                            drag.axis: Drag.XAxis
+                            property real pressX: 0
+                            onPressed: { pressX = mouse.x; runningDelegate.dragged = false }
+                            onPositionChanged: if (Math.abs(mouse.x - pressX) > 6) runningDelegate.dragged = true
+                            onReleased: if (runningDelegate.dragged) { var target = Math.round((runningDelegate.x + runningDelegate.width / 2) / (runningDelegate.width + runningList.spacing)); target = Math.max(0, Math.min(runningList.count - 1, target)); runningApps.move(index, target) }
+                            onClicked: { if (!runningDelegate.dragged) runningApps.activate(model.windowHandle); runningDelegate.dragged = false }
+                        }
                     }
                 }
             }
@@ -167,9 +182,9 @@ Window {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                spacing: 8
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 6
 
                 ListView {
                     width: 168
@@ -192,10 +207,11 @@ Window {
                 }
 
                 Column {
+                    width: 50
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 1
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.clock; color: "#F3F6FF"; font.pixelSize: 20; font.bold: true }
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.date; color: "#BFCBEE"; font.pixelSize: 10 }
+                    Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.clock; color: "#F3F6FF"; font.pixelSize: 20; font.bold: true }
+                    Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.date; color: "#BFCBEE"; font.pixelSize: 10 }
                 }
             }
         }

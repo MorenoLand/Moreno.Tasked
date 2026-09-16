@@ -84,11 +84,17 @@ QImage captureTrayIcon(const RECT &bounds)
     DeleteDC(memory);
     ReleaseDC(nullptr, screen);
     if (image.isNull()) return {};
+    image = image.convertToFormat(QImage::Format_ARGB32);
     const std::array<QRgb, 4> backgrounds{ image.pixel(0, 0), image.pixel(size - 1, 0), image.pixel(0, size - 1), image.pixel(size - 1, size - 1) };
+    const auto blend = [](QRgb first, QRgb second, int step, int total) { return qRgba(qRed(first) + (qRed(second) - qRed(first)) * step / total, qGreen(first) + (qGreen(second) - qGreen(first)) * step / total, qBlue(first) + (qBlue(second) - qBlue(first)) * step / total, 255); };
     for (int yPixel = 0; yPixel < image.height(); ++yPixel) for (int xPixel = 0; xPixel < image.width(); ++xPixel) {
         const auto pixel = image.pixel(xPixel, yPixel);
-        const auto background = std::any_of(backgrounds.cbegin(), backgrounds.cend(), [pixel](QRgb corner) { return qAbs(qRed(pixel) - qRed(corner)) + qAbs(qGreen(pixel) - qGreen(corner)) + qAbs(qBlue(pixel) - qBlue(corner)) < 72; });
-        if (background) image.setPixel(xPixel, yPixel, pixel & 0x00FFFFFF);
+        const auto top = blend(backgrounds.at(0), backgrounds.at(1), xPixel, size - 1);
+        const auto bottom = blend(backgrounds.at(2), backgrounds.at(3), xPixel, size - 1);
+        const auto background = blend(top, bottom, yPixel, size - 1);
+        const auto distance = qAbs(qRed(pixel) - qRed(background)) + qAbs(qGreen(pixel) - qGreen(background)) + qAbs(qBlue(pixel) - qBlue(background));
+        const auto alpha = qBound(0, (distance - 48) * 8, 255);
+        image.setPixel(xPixel, yPixel, qRgba(qRed(pixel), qGreen(pixel), qBlue(pixel), alpha));
     }
     QRect content;
     for (int yPixel = 0; yPixel < image.height(); ++yPixel) for (int xPixel = 0; xPixel < image.width(); ++xPixel) if (qAlpha(image.pixel(xPixel, yPixel)) > 40) content |= QRect(xPixel, yPixel, 1, 1);
@@ -292,11 +298,32 @@ void RunningAppsModel::refresh()
 #ifdef Q_OS_WIN
     WindowRefreshContext context{ {}, GetForegroundWindow() };
     EnumWindows(enumerateWindows, reinterpret_cast<LPARAM>(&context));
+    if (!items.isEmpty() && !context.items.isEmpty()) {
+        QVector<Item> ordered;
+        QSet<qulonglong> placed;
+        for (const auto &old : items) {
+            const auto found = std::find_if(context.items.begin(), context.items.end(), [&old](const Item &item) { return item.window == old.window; });
+            if (found != context.items.end()) {
+                placed.insert(found->window);
+                ordered.append(std::move(*found));
+            }
+        }
+        for (auto &item : context.items) if (!placed.contains(item.window)) ordered.append(std::move(item));
+        context.items = std::move(ordered);
+    }
     if (context.items == items) return;
     beginResetModel();
     items = std::move(context.items);
     endResetModel();
 #endif
+}
+
+void RunningAppsModel::move(int from, int to)
+{
+    if (from < 0 || to < 0 || from >= items.size() || to >= items.size() || from == to) return;
+    if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), to > from ? to + 1 : to)) return;
+    items.move(from, to);
+    endMoveRows();
 }
 
 void RunningAppsModel::activate(const QString &windowHandle)

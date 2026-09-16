@@ -94,12 +94,13 @@ void positionDock()
     GetMonitorInfoW(MonitorFromWindow(data.hWnd, MONITOR_DEFAULTTONEAREST), &monitor);
     data.rc = monitor.rcMonitor;
     SHAppBarMessage(ABM_QUERYPOS, &data);
+    data.rc.bottom = monitor.rcMonitor.bottom;
     data.rc.top = data.rc.bottom - dockHeight;
     SHAppBarMessage(ABM_SETPOS, &data);
     reservation->setGeometry(data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top);
     if (!visual) return;
     const auto width = (std::min)(1080, (std::max)(320, reservation->width() - 32));
-    visual->setGeometry(data.rc.left + (reservation->width() - width) / 2, data.rc.bottom - visual->height(), width, visual->height());
+    visual->setGeometry(data.rc.left + (reservation->width() - width) / 2, monitor.rcMonitor.bottom - visual->height() - 12, width, visual->height());
 }
 }
 
