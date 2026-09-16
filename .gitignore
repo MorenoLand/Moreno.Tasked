@@ -1,5 +1,6 @@
 /build/
 /bin/
+/SESSION*/
 /out/
 /install/
 *.user
