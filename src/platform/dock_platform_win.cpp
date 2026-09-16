@@ -25,6 +25,7 @@ QWindow *visual = nullptr;
 QAbstractNativeEventFilter *eventFilter = nullptr;
 QVector<HWND> hiddenTaskbars;
 int dockHeight = 92;
+int dockPosition = 0;
 UINT taskbarCreatedMessage = 0;
 bool takeover = false;
 QTimer *startPositionTimer = nullptr;
@@ -34,9 +35,28 @@ bool startMenuOpen = false;
 QTimer *trayFlyoutTimer = nullptr;
 QRect trayFlyoutAnchor;
 int trayFlyoutMisses = 0;
+QTimer *fullscreenTimer = nullptr;
+bool fullscreenHidden = false;
 
 HWND nativeHandle(QWindow *window) { return reinterpret_cast<HWND>(window->winId()); }
 void positionDock();
+bool isShellExperience(HWND window);
+
+void updateFullscreenVisibility()
+{
+    if (!visual) return;
+    const auto foreground = GetForegroundWindow();
+    bool fullscreen = false;
+    if (foreground && foreground != nativeHandle(visual) && foreground != nativeHandle(reservation) && !isShellExperience(foreground)) {
+        RECT bounds{};
+        const auto monitor = MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO info{ sizeof(info) };
+        if (GetWindowRect(foreground, &bounds) && GetMonitorInfoW(monitor, &info)) fullscreen = bounds.left <= info.rcMonitor.left && bounds.top <= info.rcMonitor.top && bounds.right >= info.rcMonitor.right && bounds.bottom >= info.rcMonitor.bottom;
+    }
+    if (fullscreen == fullscreenHidden) return;
+    fullscreenHidden = fullscreen;
+    ShowWindow(nativeHandle(visual), fullscreen ? SW_HIDE : SW_SHOWNA);
+}
 
 bool isTaskbar(HWND window)
 {
@@ -330,19 +350,33 @@ void positionDock()
     APPBARDATA data{};
     data.cbSize = sizeof(data);
     data.hWnd = nativeHandle(reservation);
-    data.uEdge = ABE_BOTTOM;
+    data.uEdge = dockPosition == 0 ? ABE_BOTTOM : dockPosition == 1 ? ABE_TOP : dockPosition == 2 ? ABE_LEFT : ABE_RIGHT;
     MONITORINFO monitor{ sizeof(monitor) };
     GetMonitorInfoW(MonitorFromWindow(data.hWnd, MONITOR_DEFAULTTONEAREST), &monitor);
     data.rc = monitor.rcMonitor;
     SHAppBarMessage(ABM_QUERYPOS, &data);
-    data.rc.bottom = monitor.rcMonitor.bottom;
-    data.rc.top = data.rc.bottom - dockHeight;
+    if (dockPosition == 0) {
+        data.rc.bottom = monitor.rcMonitor.bottom;
+        data.rc.top = data.rc.bottom - dockHeight;
+    } else if (dockPosition == 1) {
+        data.rc.top = monitor.rcMonitor.top;
+        data.rc.bottom = data.rc.top + dockHeight;
+    } else if (dockPosition == 2) {
+        data.rc.left = monitor.rcMonitor.left;
+        data.rc.right = data.rc.left + dockHeight;
+    } else {
+        data.rc.right = monitor.rcMonitor.right;
+        data.rc.left = data.rc.right - dockHeight;
+    }
     SHAppBarMessage(ABM_SETPOS, &data);
     reservation->setGeometry(data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top);
     if (!visual) return;
-    const auto maximumWidth = (std::max)(320, reservation->width() - 32);
-    const auto width = (std::min)(maximumWidth, (std::max)(320, visual->width()));
-    visual->setGeometry(data.rc.left + (reservation->width() - width) / 2, monitor.rcMonitor.bottom - visual->height() - 12, width, visual->height());
+    const auto horizontal = dockPosition < 2;
+    const auto maximumLength = (std::max)(320, (horizontal ? reservation->width() : reservation->height()) - 32);
+    const auto currentLength = horizontal ? visual->width() : visual->height();
+    const auto length = (std::min)(maximumLength, (std::max)(320, currentLength));
+    if (horizontal) visual->setGeometry(data.rc.left + (reservation->width() - length) / 2, dockPosition == 1 ? monitor.rcMonitor.top + 12 : monitor.rcMonitor.bottom - visual->height() - 12, length, visual->height());
+    else visual->setGeometry(dockPosition == 2 ? monitor.rcMonitor.left + 12 : monitor.rcMonitor.right - visual->width() - 12, monitor.rcMonitor.top + (reservation->height() - length) / 2, visual->width(), length);
 }
 }
 
@@ -362,10 +396,11 @@ void tasked::platform::showStartMenu(const QRect &anchor)
 
 void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { trayFlyoutMonitor(anchor); }
 
-QRect tasked::platform::installDock(QWindow *visualWindow, int height)
+QRect tasked::platform::installDock(QWindow *visualWindow, int height, int position)
 {
     visual = visualWindow;
     dockHeight = height;
+    dockPosition = (std::max)(0, (std::min)(3, position));
     taskbarCreatedMessage = RegisterWindowMessageW(L"TaskbarCreated");
     if (startTaskbarGuard()) {
         hideTaskbars();
@@ -383,8 +418,19 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height)
     eventFilter = new DockEventFilter;
     qApp->installNativeEventFilter(eventFilter);
     QObject::connect(visual, &QWindow::widthChanged, visual, [](int) { positionDock(); });
+    QObject::connect(visual, &QWindow::heightChanged, visual, [](int) { positionDock(); });
+    fullscreenTimer = new QTimer(qApp);
+    fullscreenTimer->setInterval(250);
+    QObject::connect(fullscreenTimer, &QTimer::timeout, updateFullscreenVisibility);
+    fullscreenTimer->start();
     positionDock();
     return visual->geometry();
+}
+
+void tasked::platform::setDockPosition(int position)
+{
+    dockPosition = (std::max)(0, (std::min)(3, position));
+    positionDock();
 }
 
 void tasked::platform::uninstallDock()
@@ -400,6 +446,13 @@ void tasked::platform::uninstallDock()
         delete eventFilter;
         eventFilter = nullptr;
     }
+    if (fullscreenTimer) {
+        fullscreenTimer->stop();
+        delete fullscreenTimer;
+        fullscreenTimer = nullptr;
+    }
+    if (fullscreenHidden && visual) ShowWindow(nativeHandle(visual), SW_SHOWNA);
+    fullscreenHidden = false;
     if (takeover) {
         restoreTaskbars();
         takeover = false;

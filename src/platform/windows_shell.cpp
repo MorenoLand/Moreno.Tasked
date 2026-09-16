@@ -167,6 +167,7 @@ QVector<TrayModel::Item> automationTrayItems(bool capture)
         item.automationId = automationId;
         item.ordinal = ordinal;
         item.automationElement = reinterpret_cast<quintptr>(element);
+        if (bounds.right > bounds.left && bounds.bottom > bounds.top) item.bounds = QRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
         if (capture && !offscreen && IsWindowVisible(shell)) item.image = captureTrayIcon(bounds);
         result.append(item);
     }
@@ -255,6 +256,7 @@ void enumerateToolbar(HWND toolbar, QVector<TrayModel::Item> &items)
         CloseHandle(process);
         return;
     }
+    const auto remoteRect = VirtualAllocEx(process, nullptr, sizeof(RECT), MEM_COMMIT, PAGE_READWRITE);
     const auto count = static_cast<int>(SendMessageW(toolbar, TB_BUTTONCOUNT, 0, 0));
     for (int index = 0; index < count; ++index) {
         TBBUTTON button{};
@@ -264,10 +266,34 @@ void enumerateToolbar(HWND toolbar, QVector<TrayModel::Item> &items)
         if (!ReadProcessMemory(process, reinterpret_cast<const void *>(button.dwData), &tray, sizeof(tray), nullptr) || !tray.owner || !tray.callback) continue;
         const auto key = static_cast<qulonglong>(reinterpret_cast<quintptr>(tray.owner)) ^ (static_cast<qulonglong>(tray.id) << 32) ^ static_cast<qulonglong>(reinterpret_cast<quintptr>(toolbar));
         const auto path = processPath(tray.owner);
-        items.append({ key, static_cast<qulonglong>(reinterpret_cast<quintptr>(tray.owner)), tray.id, tray.callback, reinterpret_cast<quintptr>(tray.icon), path.isEmpty() ? QStringLiteral("Tray icon") : QFileInfo(path).fileName() });
+        TrayModel::Item item{ key, static_cast<qulonglong>(reinterpret_cast<quintptr>(tray.owner)), tray.id, tray.callback, reinterpret_cast<quintptr>(tray.icon), path.isEmpty() ? QStringLiteral("Tray icon") : QFileInfo(path).fileName() };
+        if (remoteRect) {
+            RECT bounds{};
+            if (SendMessageW(toolbar, TB_GETITEMRECT, index, reinterpret_cast<LPARAM>(remoteRect)) && ReadProcessMemory(process, remoteRect, &bounds, sizeof(bounds), nullptr)) {
+                MapWindowPoints(toolbar, nullptr, reinterpret_cast<POINT *>(&bounds), 2);
+                item.bounds = QRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+            }
+        }
+        items.append(item);
     }
+    if (remoteRect) VirtualFreeEx(process, remoteRect, 0, MEM_RELEASE);
     VirtualFreeEx(process, remote, 0, MEM_RELEASE);
     CloseHandle(process);
+}
+
+void enrichTrayItems(QVector<TrayModel::Item> &items, const QVector<TrayModel::Item> &native)
+{
+    QSet<int> used;
+    for (auto &item : items) {
+        const auto found = std::find_if(native.cbegin(), native.cend(), [&item, &used, &native](const TrayModel::Item &candidate) { const auto index = static_cast<int>(&candidate - native.constData()); return !used.contains(index) && item.bounds.isValid() && candidate.bounds.isValid() && (item.bounds.contains(candidate.bounds.center()) || candidate.bounds.contains(item.bounds.center())); });
+        if (found == native.cend()) continue;
+        const auto index = static_cast<int>(&(*found) - native.constData());
+        used.insert(index);
+        item.owner = found->owner;
+        item.id = found->id;
+        item.callback = found->callback;
+        item.icon = found->icon;
+    }
 }
 #endif
 }
@@ -466,8 +492,12 @@ void TrayModel::refresh()
     const auto shell = FindWindowW(L"Shell_TrayWnd", nullptr);
     const auto visible = shell && IsWindowVisible(shell);
     QVector<Item> next = automationTrayItems(visible);
-    if (next.isEmpty() && !visible) return;
-    if (next.isEmpty()) for (const auto toolbar : trayToolbars()) enumerateToolbar(toolbar, next);
+    QVector<Item> native;
+    for (const auto toolbar : trayToolbars()) enumerateToolbar(toolbar, native);
+    if (next.isEmpty()) {
+        next = std::move(native);
+        if (next.isEmpty() && !visible) return;
+    } else enrichTrayItems(next, native);
     if (!items.isEmpty() && !next.isEmpty()) {
         QVector<Item> ordered;
         QSet<qulonglong> placed;
@@ -530,7 +560,12 @@ void TrayModel::activate(const QString &key, int action)
     const auto found = std::find_if(items.cbegin(), items.cend(), [value](const Item &item) { return item.key == value; });
     if (!ok || found == items.cend()) return;
     if (found->automationElement) {
-        if (action != 3) invokeAutomationItem(found->automationElement);
+        if (action == 1 && found->owner && found->callback) {
+            const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
+            SetForegroundWindow(owner);
+            PostMessageW(owner, found->callback, found->id, WM_RBUTTONDOWN);
+            PostMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
+        } else if (action != 3) invokeAutomationItem(found->automationElement);
         return;
     }
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));

@@ -54,7 +54,8 @@ int main(int argc, char *argv[])
     auto *window = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
     if (!window) return -1;
     window->setIcon(appIcon);
-    window->setGeometry(tasked::platform::installDock(window, 92));
+    window->setGeometry(tasked::platform::installDock(window, 92, taskedSettings.dockPosition()));
+    QObject::connect(&taskedSettings, &TaskedSettings::dockPositionChanged, [&taskedSettings] { tasked::platform::setDockPosition(taskedSettings.dockPosition()); });
     window->show();
 #ifdef Q_OS_WIN
     const auto nativeWindow = reinterpret_cast<HWND>(window->winId());

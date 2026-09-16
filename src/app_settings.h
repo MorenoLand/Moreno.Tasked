@@ -6,6 +6,9 @@ class TaskedSettings final : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool splitMode READ splitMode WRITE setSplitMode NOTIFY splitModeChanged)
+    Q_PROPERTY(bool spacedMode READ spacedMode WRITE setSpacedMode NOTIFY spacedModeChanged)
+    Q_PROPERTY(bool dockLocked READ dockLocked WRITE setDockLocked NOTIFY dockLockedChanged)
+    Q_PROPERTY(int dockPosition READ dockPosition WRITE setDockPosition NOTIFY dockPositionChanged)
     Q_PROPERTY(bool searchEnabled READ searchEnabled WRITE setSearchEnabled NOTIFY searchEnabledChanged)
     Q_PROPERTY(bool clockEnabled READ clockEnabled WRITE setClockEnabled NOTIFY clockEnabledChanged)
     Q_PROPERTY(bool secondsEnabled READ secondsEnabled WRITE setSecondsEnabled NOTIFY secondsEnabledChanged)
@@ -24,12 +27,16 @@ class TaskedSettings final : public QObject
     Q_PROPERTY(int clockSize READ clockSize WRITE setClockSize NOTIFY clockSizeChanged)
     Q_PROPERTY(int iconSize READ iconSize WRITE setIconSize NOTIFY iconSizeChanged)
     Q_PROPERTY(int trayIconSize READ trayIconSize WRITE setTrayIconSize NOTIFY trayIconSizeChanged)
+    Q_PROPERTY(int trayScale READ trayScale WRITE setTrayScale NOTIFY trayScaleChanged)
     Q_PROPERTY(int surfaceOpacity READ surfaceOpacity WRITE setSurfaceOpacity NOTIFY surfaceOpacityChanged)
     Q_PROPERTY(int backgroundOpacity READ backgroundOpacity WRITE setBackgroundOpacity NOTIFY backgroundOpacityChanged)
     Q_PROPERTY(int cornerRadius READ cornerRadius WRITE setCornerRadius NOTIFY cornerRadiusChanged)
 public:
     explicit TaskedSettings(QObject *parent = nullptr);
     bool splitMode() const;
+    bool spacedMode() const;
+    bool dockLocked() const;
+    int dockPosition() const;
     bool searchEnabled() const;
     bool clockEnabled() const;
     bool secondsEnabled() const;
@@ -48,10 +55,14 @@ public:
     int clockSize() const;
     int iconSize() const;
     int trayIconSize() const;
+    int trayScale() const;
     int surfaceOpacity() const;
     int backgroundOpacity() const;
     int cornerRadius() const;
     Q_INVOKABLE void setSplitMode(bool enabled);
+    Q_INVOKABLE void setSpacedMode(bool enabled);
+    Q_INVOKABLE void setDockLocked(bool enabled);
+    Q_INVOKABLE void setDockPosition(int value);
     Q_INVOKABLE void setSearchEnabled(bool enabled);
     Q_INVOKABLE void setClockEnabled(bool enabled);
     Q_INVOKABLE void setSecondsEnabled(bool enabled);
@@ -64,18 +75,25 @@ public:
     Q_INVOKABLE void setTrayScrollEnabled(bool enabled);
     Q_INVOKABLE void setPreviewsEnabled(bool enabled);
     Q_INVOKABLE void setAnimationsEnabled(bool enabled);
+    Q_INVOKABLE int sectionOffsetX(const QString &section) const;
+    Q_INVOKABLE int sectionOffsetY(const QString &section) const;
+    Q_INVOKABLE void setSectionOffset(const QString &section, int x, int y);
     Q_INVOKABLE void setTheme(int value);
     Q_INVOKABLE void setFontFamily(const QString &value);
     Q_INVOKABLE void setLabelSize(int value);
     Q_INVOKABLE void setClockSize(int value);
     Q_INVOKABLE void setIconSize(int value);
     Q_INVOKABLE void setTrayIconSize(int value);
+    Q_INVOKABLE void setTrayScale(int value);
     Q_INVOKABLE void setSurfaceOpacity(int value);
     Q_INVOKABLE void setBackgroundOpacity(int value);
     Q_INVOKABLE void setCornerRadius(int value);
     Q_INVOKABLE void reset();
 signals:
     void splitModeChanged();
+    void spacedModeChanged();
+    void dockLockedChanged();
+    void dockPositionChanged();
     void searchEnabledChanged();
     void clockEnabledChanged();
     void secondsEnabledChanged();
@@ -94,11 +112,15 @@ signals:
     void clockSizeChanged();
     void iconSizeChanged();
     void trayIconSizeChanged();
+    void trayScaleChanged();
     void surfaceOpacityChanged();
     void backgroundOpacityChanged();
     void cornerRadiusChanged();
 private:
     bool split = false;
+    bool spaced = true;
+    bool dockLock = true;
+    int position = 0;
     bool search = false;
     bool clock = true;
     bool seconds = false;
@@ -117,6 +139,7 @@ private:
     int clockFont = 20;
     int icon = 42;
     int trayIcon = 16;
+    int trayScaleValue = 100;
     int opacity = 100;
     int background = 100;
     int radius = 22;
