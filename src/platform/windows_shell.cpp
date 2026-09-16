@@ -511,13 +511,18 @@ void TrayModel::refresh()
 {
 #ifdef Q_OS_WIN
     const auto shell = FindWindowW(L"Shell_TrayWnd", nullptr);
+    const auto recover = shell && !IsWindowVisible(shell) && items.isEmpty();
+    if (recover) ShowWindow(shell, SW_SHOWNOACTIVATE);
     const auto visible = shell && IsWindowVisible(shell);
     QVector<Item> next = automationTrayItems(visible);
     QVector<Item> native;
     for (const auto toolbar : trayToolbars()) enumerateToolbar(toolbar, native);
     if (next.isEmpty()) {
         next = std::move(native);
-        if (next.isEmpty() && !visible) return;
+        if (next.isEmpty() && !visible) {
+            if (recover) ShowWindow(shell, SW_HIDE);
+            return;
+        }
     } else enrichTrayItems(next, native);
     if (!items.isEmpty() && !next.isEmpty()) {
         QVector<Item> ordered;
@@ -542,6 +547,7 @@ void TrayModel::refresh()
         for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).image.isNull() != items.at(i).image.isNull()) { same = false; break; }
         if (same) {
             releaseAutomationItems(next);
+            if (recover) ShowWindow(shell, SW_HIDE);
             return;
         }
     }
@@ -549,6 +555,7 @@ void TrayModel::refresh()
     releaseAutomationItems(items);
     items = std::move(next);
     endResetModel();
+    if (recover) ShowWindow(shell, SW_HIDE);
 #endif
 }
 
