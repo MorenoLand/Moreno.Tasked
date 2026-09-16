@@ -389,14 +389,12 @@ void RunningAppsModel::showTaskMenu(const QString &windowHandle, int x, int y)
     if (!ok || !IsWindow(window)) return;
     const auto menu = GetSystemMenu(window, FALSE);
     if (!menu) return;
-    const auto targetThread = GetWindowThreadProcessId(window, nullptr);
-    const auto currentThread = GetCurrentThreadId();
-    const auto attached = targetThread && targetThread != currentThread && AttachThreadInput(currentThread, targetThread, TRUE);
-    SetForegroundWindow(window);
-    const auto command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, x, y, window, nullptr);
-    PostMessageW(window, WM_NULL, 0, 0);
+    const auto owner = FindWindowW(nullptr, L"Tasked");
+    if (!owner) return;
+    SetForegroundWindow(owner);
+    const auto command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, x, y, owner, nullptr);
+    PostMessageW(owner, WM_NULL, 0, 0);
     if (command) PostMessageW(window, WM_SYSCOMMAND, command, 0);
-    if (attached) AttachThreadInput(currentThread, targetThread, FALSE);
 #else
     Q_UNUSED(windowHandle);
     Q_UNUSED(x);
@@ -606,7 +604,7 @@ void TrayModel::showContextMenu(const QString &key, int x, int y)
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
     if (!IsWindow(owner)) return;
     SetForegroundWindow(owner);
-    PostMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
+    SendMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
     PostMessageW(owner, WM_NULL, 0, 0);
 #else
     Q_UNUSED(key);
