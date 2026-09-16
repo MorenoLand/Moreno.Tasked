@@ -363,6 +363,7 @@ void RunningAppsModel::close(const QString &windowHandle)
 TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
 {
     overflowKeys = QSettings().value("tray/overflowKeys").toStringList();
+    trayOrder = QSettings().value("tray/order").toStringList();
     connect(&timer, &QTimer::timeout, this, &TrayModel::refresh);
     timer.start(1000);
     refresh();
@@ -375,6 +376,59 @@ void TrayModel::setOverflow(const QString &key, bool enabled)
     if (enabled) overflowKeys.append(key); else overflowKeys.removeAll(key);
     QSettings().setValue("tray/overflowKeys", overflowKeys);
     emit overflowChanged();
+}
+
+void TrayModel::applySavedOrder(QVector<Item> &next) const
+{
+    if (trayOrder.isEmpty()) return;
+    QVector<Item> ordered;
+    QSet<qulonglong> placed;
+    for (const auto &key : trayOrder) {
+        bool ok = false;
+        const auto value = key.toULongLong(&ok);
+        const auto found = std::find_if(next.cbegin(), next.cend(), [value, ok](const Item &item) { return ok && item.key == value; });
+        if (found != next.cend()) {
+            placed.insert(found->key);
+            ordered.append(*found);
+        }
+    }
+    for (const auto &item : next) if (!placed.contains(item.key)) ordered.append(item);
+    next = std::move(ordered);
+}
+
+void TrayModel::saveOrder()
+{
+    trayOrder.clear();
+    for (const auto &item : items) trayOrder.append(QString::number(item.key));
+    QSettings().setValue("tray/order", trayOrder);
+}
+
+void TrayModel::reorder(const QStringList &orderedKeys, bool overflowOnly)
+{
+    QVector<Item> reordered;
+    QSet<qulonglong> placed;
+    for (const auto &key : orderedKeys) {
+        bool ok = false;
+        const auto value = key.toULongLong(&ok);
+        const auto found = std::find_if(items.cbegin(), items.cend(), [value, ok, this, overflowOnly](const Item &item) { return ok && item.key == value && isOverflow(QString::number(item.key)) == overflowOnly; });
+        if (found != items.cend()) {
+            placed.insert(found->key);
+            reordered.append(*found);
+        }
+    }
+    for (const auto &item : items) if (isOverflow(QString::number(item.key)) == overflowOnly && !placed.contains(item.key)) {
+        placed.insert(item.key);
+        reordered.append(item);
+    }
+    for (const auto &item : items) if (!placed.contains(item.key)) reordered.append(item);
+    if (reordered.size() != items.size()) return;
+    bool changed = false;
+    for (int index = 0; index < items.size(); ++index) if (items.at(index).key != reordered.at(index).key) { changed = true; break; }
+    if (!changed) return;
+    beginResetModel();
+    items = std::move(reordered);
+    endResetModel();
+    saveOrder();
 }
 
 TrayModel::~TrayModel()
@@ -418,6 +472,7 @@ void TrayModel::refresh()
         for (auto &item : next) if (!placed.contains(item.key)) ordered.append(std::move(item));
         next = std::move(ordered);
     }
+    applySavedOrder(next);
     for (auto &item : next) {
         const auto old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.key == item.key; });
         if (old != items.cend() && item.image.isNull()) item.image = old->image;
@@ -503,3 +558,12 @@ bool TrayFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceP
 }
 
 void TrayFilterModel::refreshFilter() { invalidateFilter(); emit countChanged(); }
+
+void TrayFilterModel::move(int from, int to)
+{
+    if (!tray || from < 0 || to < 0 || from >= rowCount() || to >= rowCount() || from == to) return;
+    QStringList orderedKeys;
+    for (int row = 0; row < rowCount(); ++row) orderedKeys.append(data(index(row, 0), TrayModel::KeyRole).toString());
+    orderedKeys.move(from, to);
+    tray->reorder(orderedKeys, overflowOnly);
+}

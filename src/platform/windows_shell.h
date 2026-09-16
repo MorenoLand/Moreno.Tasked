@@ -42,12 +42,16 @@ public:
     Q_INVOKABLE void activate(const QString &key, int action);
     Q_INVOKABLE bool isOverflow(const QString &key) const;
     Q_INVOKABLE void setOverflow(const QString &key, bool enabled);
+    void reorder(const QStringList &orderedKeys, bool overflowOnly);
 signals:
     void overflowChanged();
 private:
     void refresh();
+    void applySavedOrder(QVector<Item> &next) const;
+    void saveOrder();
     QVector<Item> items;
     QStringList overflowKeys;
+    QStringList trayOrder;
     QTimer timer;
 };
 
@@ -58,6 +62,7 @@ class TrayFilterModel final : public QSortFilterProxyModel
 public:
     TrayFilterModel(TrayModel *source, bool overflow, QObject *parent = nullptr);
     int count() const { return rowCount(); }
+    Q_INVOKABLE void move(int from, int to);
 signals:
     void countChanged();
 protected:

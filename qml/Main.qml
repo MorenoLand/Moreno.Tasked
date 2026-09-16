@@ -18,6 +18,7 @@ Window {
     property bool startButtonEnabled: taskedSettings.startButtonEnabled
     property bool labelsEnabled: taskedSettings.labelsEnabled
     property bool trayWrapEnabled: taskedSettings.trayWrapEnabled
+    property bool trayScrollEnabled: taskedSettings.trayScrollEnabled
     property bool settingsOpen: false
     property int settingsTab: 0
     property int theme: taskedSettings.theme
@@ -41,11 +42,11 @@ Window {
     property bool dividerTwoVisible: dividersEnabled && taskButtonEnabled && searchEnabled
     property int leftWidth: buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2
     property int clockWidth: clockEnabled ? (secondsEnabled ? 98 : 78) : 0
-    property int overflowButtonWidth: overflowTrayIcons.count > 0 ? 30 : 0
+    property int overflowButtonWidth: overflowTrayIcons.count > 0 ? 26 : 0
     property int trayControlGaps: (clockEnabled ? 1 : 0) + (overflowButtonWidth > 0 ? 1 : 0)
-    property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * 34 - 4)
-    property int rightWidth: trayWrapEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + clockWidth + trayControlGaps * 12)
-    property int trayListWidth: trayWrapEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - clockWidth - trayControlGaps * 12) : unwrappedTrayWidth
+    property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * 30 - 4)
+    property int rightWidth: trayWrapEnabled || trayScrollEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + clockWidth + trayControlGaps * 12)
+    property int trayListWidth: trayWrapEnabled || trayScrollEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - clockWidth - trayControlGaps * 12) : unwrappedTrayWidth
     property int middleWidth: Math.max(320, root.width - leftWidth - rightWidth - (splitMode ? 20 : 0))
     property int preferredDockWidth: Math.max(1080, leftWidth + 320 + rightWidth + (splitMode ? 20 : 0))
     property string clock: Qt.formatTime(new Date(), secondsEnabled ? "HH:mm:ss" : "HH:mm")
@@ -115,7 +116,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: 6
+                        anchors.topMargin: 10
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: startMouse.containsMouse ? 1.1 : 1
@@ -152,7 +153,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: 6
+                        anchors.topMargin: 10
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: taskMouse.containsMouse ? 1.1 : 1
@@ -184,7 +185,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: 6
+                        anchors.topMargin: 10
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.iconSurfaceColor
                         scale: searchMouse.containsMouse ? 1.1 : 1
@@ -235,7 +236,7 @@ Window {
                             height: root.iconSize
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.top: parent.top
-                            anchors.topMargin: 6
+                            anchors.topMargin: 10
                             radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                             color: root.iconSurfaceColor
                             opacity: runningMouse.containsMouse ? 1 : 0.94
@@ -281,14 +282,31 @@ Window {
             Component {
                 id: trayDelegate
                 Item {
-                    width: root.trayWrapEnabled ? 26 : 30
-                    height: root.trayWrapEnabled ? 26 : 34
+                    id: trayItem
+                    width: root.trayWrapEnabled ? 22 : 26
+                    height: root.trayWrapEnabled ? 22 : 30
+                    property bool dragged: false
+                    property real pressX: 0
+                    property real pressY: 0
                     scale: trayMouse.containsMouse ? 1.12 : 1
                     Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
-                    Rectangle { anchors.centerIn: parent; width: root.trayWrapEnabled ? 26 : 30; height: root.trayWrapEnabled ? 26 : 30; radius: 9; color: root.iconSurfaceColor }
-                    Image { id: trayImage; anchors.centerIn: parent; width: root.trayWrapEnabled ? 22 : 26; height: root.trayWrapEnabled ? 22 : 26; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 1 }
+                    Rectangle { anchors.centerIn: parent; width: root.trayWrapEnabled ? 22 : 26; height: root.trayWrapEnabled ? 22 : 26; radius: 7; color: root.iconSurfaceColor }
+                    Image { id: trayImage; anchors.centerIn: parent; width: root.trayWrapEnabled ? 18 : 22; height: root.trayWrapEnabled ? 18 : 22; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 1 }
                     Text { anchors.centerIn: parent; text: model.tooltip.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize + 2; font.bold: true; visible: trayImage.status !== Image.Ready }
-                    MouseArea { id: trayMouse; anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; hoverEnabled: true; onEntered: trayIcons.activate(model.key, 3); onClicked: if (mouse.button === Qt.LeftButton) trayIcons.activate(model.key, 0); onPressed: if (mouse.button === Qt.RightButton) root.openTrayContextMenu(model.key) }
+                    MouseArea {
+                        id: trayMouse
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        hoverEnabled: true
+                        preventStealing: true
+                        drag.target: trayItem
+                        drag.axis: root.trayWrapEnabled ? Drag.XAndYAxis : Drag.XAxis
+                        onEntered: trayIcons.activate(model.key, 3)
+                        onPressed: { if (mouse.button === Qt.RightButton) { root.openTrayContextMenu(model.key); return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false }
+                        onPositionChanged: if (Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5) trayItem.dragged = true
+                        onReleased: if (trayItem.dragged) { var position = root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX; var columns = Math.max(1, Math.floor((root.trayListWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4)); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) }
+                        onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) trayIcons.activate(model.key, 0); trayItem.dragged = false }
+                    }
                 }
             }
 
@@ -304,6 +322,8 @@ Window {
                     visible: !root.trayWrapEnabled
                     anchors.verticalCenter: parent.verticalCenter
                     clip: true
+                    interactive: root.trayScrollEnabled
+                    boundsBehavior: Flickable.StopAtBounds
                     orientation: ListView.Horizontal
                     spacing: 4
                     id: trayList
@@ -313,7 +333,7 @@ Window {
 
                 Flow {
                     width: root.trayListWidth
-                    height: 64
+                    height: 52
                     visible: root.trayWrapEnabled
                     anchors.verticalCenter: parent.verticalCenter
                     clip: true
@@ -324,10 +344,10 @@ Window {
                 Item {
                     id: trayOverflowButton
                     width: root.overflowButtonWidth
-                    height: 34
+                    height: 30
                     visible: overflowTrayIcons.count > 0
-                    Rectangle { anchors.fill: parent; radius: 9; color: root.iconSurfaceColor }
-                    Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 17; font.bold: true }
+                    Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
+                    Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
                     MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.openPanel() }
                 }
 
@@ -528,8 +548,9 @@ Window {
                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Search"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.searchEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.searchEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSearchEnabled(!taskedSettings.searchEnabled) } } }
                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Clock"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.clockEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.clockEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockEnabled(!taskedSettings.clockEnabled) } } }
                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Dividers"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.dividersEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.dividersEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setDividersEnabled(!taskedSettings.dividersEnabled) } } }
-                                Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Wrap tray icons"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayWrapEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayWrapEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayWrapEnabled(!taskedSettings.trayWrapEnabled) } } }
-                                Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Labels"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.labelsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.labelsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelsEnabled(!taskedSettings.labelsEnabled) } } }
+                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Wrap tray icons"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayWrapEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayWrapEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayWrapEnabled(!taskedSettings.trayWrapEnabled) } } }
+                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Scroll tray overflow"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayScrollEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayScrollEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayScrollEnabled(!taskedSettings.trayScrollEnabled) } } }
+                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Labels"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.labelsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.labelsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelsEnabled(!taskedSettings.labelsEnabled) } } }
                             }
                         }
                     }
@@ -585,8 +606,8 @@ Window {
     Window {
         id: trayOverflowWindow
         visible: false
-        width: Math.min(380, Math.max(150, Math.min(8, overflowTrayIcons.count) * 38 + 24))
-        height: Math.max(86, Math.ceil(overflowTrayIcons.count / 8) * 38 + 54)
+        width: Math.min(340, Math.max(136, Math.min(8, overflowTrayIcons.count) * 34 + 24))
+        height: Math.max(82, Math.ceil(overflowTrayIcons.count / 8) * 34 + 54)
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
         transientParent: root
@@ -614,10 +635,10 @@ Window {
                 Repeater {
                     model: overflowTrayIcons
                     delegate: Item {
-                        width: 30
-                        height: 30
-                        Rectangle { anchors.fill: parent; radius: 9; color: root.iconSurfaceColor }
-                        Image { anchors.centerIn: parent; width: 22; height: 22; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
+                        width: 26
+                        height: 26
+                        Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
+                        Image { anchors.centerIn: parent; width: 18; height: 18; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
                         MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: if (mouse.button === Qt.RightButton) root.openTrayContextMenu(model.key); onClicked: if (mouse.button === Qt.LeftButton) trayIcons.activate(model.key, 0) }
                     }
                 }
