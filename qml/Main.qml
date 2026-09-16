@@ -17,8 +17,17 @@ Window {
     property bool taskButtonEnabled: taskedSettings.taskButtonEnabled
     property bool startButtonEnabled: taskedSettings.startButtonEnabled
     property bool labelsEnabled: taskedSettings.labelsEnabled
+    property bool trayEnabled: taskedSettings.trayEnabled
     property bool trayWrapEnabled: taskedSettings.trayWrapEnabled
     property bool trayScrollEnabled: taskedSettings.trayScrollEnabled
+    property bool previewsEnabled: taskedSettings.previewsEnabled
+    property bool animationsEnabled: taskedSettings.animationsEnabled
+    property int animationDuration: animationsEnabled ? 220 : 0
+    property int fastAnimationDuration: animationsEnabled ? 130 : 0
+    property int fadeAnimationDuration: animationsEnabled ? 180 : 0
+    property int shortAnimationDuration: animationsEnabled ? 150 : 0
+    property int quickAnimationDuration: animationsEnabled ? 140 : 0
+    property int closeAnimationDuration: animationsEnabled ? 120 : 0
     property bool settingsOpen: false
     property int settingsTab: 0
     property int theme: taskedSettings.theme
@@ -46,8 +55,8 @@ Window {
     property int overflowButtonWidth: overflowTrayIcons.count > 0 ? trayIconSize + 4 : 0
     property int trayControlGaps: (clockEnabled ? 1 : 0) + (overflowButtonWidth > 0 ? 1 : 0)
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * (trayIconSize + 4) - 4)
-    property int rightWidth: trayWrapEnabled || trayScrollEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + clockWidth + trayControlGaps * 12)
-    property int trayListWidth: trayWrapEnabled || trayScrollEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - clockWidth - trayControlGaps * 12) : unwrappedTrayWidth
+    property int rightWidth: trayEnabled ? (trayWrapEnabled || trayScrollEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + clockWidth + trayControlGaps * 12)) : 0
+    property int trayListWidth: trayEnabled ? (trayWrapEnabled || trayScrollEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - clockWidth - trayControlGaps * 12) : unwrappedTrayWidth) : 0
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
     property int preferredDockWidth: Math.max(1080, leftWidth + middleWidth + rightWidth + (splitMode ? 20 : 0))
     property string clock: Qt.formatTime(new Date(), secondsEnabled ? "HH:mm:ss" : "HH:mm")
@@ -57,14 +66,16 @@ Window {
     property string trayContextKey: ""
     function openContextMenu() { trayContextKey = ""; contextMenu.openMenu() }
     function openTrayContextMenu(key) { trayContextKey = key; contextMenu.openMenu() }
+    function showSystemTrayFlyout() { var point = trayPanel.mapToGlobal(0, 0); launcher.showSystemTrayFlyout(Math.round(point.x), Math.round(point.y), Math.round(trayPanel.width), Math.round(trayPanel.height)) }
     function showStartMenu() { var point = startButton.mapToGlobal(0, 0); launcher.showStartMenu(Math.round(point.x), Math.round(point.y), Math.round(startButton.width), Math.round(startButton.height)) }
-    function schedulePreview(handle, item, title) { previewHandle = handle; previewTitle = title; previewItem = item; previewCloseTimer.stop(); previewOpenTimer.restart() }
+    function schedulePreview(handle, item, title) { if (!previewsEnabled) return; previewHandle = handle; previewTitle = title; previewItem = item; previewCloseTimer.stop(); previewOpenTimer.restart() }
     function openPreview() { if (!previewItem) return; var point = previewItem.mapToGlobal(0, 0); var x = point.x + (previewItem.width - previewWindow.width) / 2; var y = point.y - previewWindow.height - 12; if (y < 8) y = point.y + previewItem.height + 12; previewWindow.x = Math.round(x); previewWindow.y = Math.round(y); previewWindow.show(); previewWindow.raise(); previewController.show(previewHandle, previewWindow, previewWindow.width, previewWindow.height) }
     function closePreview() { previewOpenTimer.stop(); previewCloseTimer.restart() }
     property var previewItem: null
     Timer { id: previewOpenTimer; interval: 280; onTriggered: root.openPreview() }
     Timer { id: previewCloseTimer; interval: 140; onTriggered: { previewController.hide(); previewWindow.hide() } }
     Timer { interval: 1000; running: true; repeat: true; onTriggered: { root.clock = Qt.formatTime(new Date(), root.secondsEnabled ? "HH:mm:ss" : "HH:mm"); root.date = Qt.formatDate(new Date(), "MMM d") } }
+    onPreviewsEnabledChanged: if (!previewsEnabled) root.closePreview()
     onPreferredDockWidthChanged: if (width !== preferredDockWidth) width = preferredDockWidth
 
     Rectangle {
@@ -77,8 +88,8 @@ Window {
         color: root.surfaceBackgroundColor
         opacity: root.splitMode ? 0 : 1
         scale: root.splitMode ? 0.98 : 1
-        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
-        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+        Behavior on opacity { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+        Behavior on scale { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
     }
 
     Row {
@@ -86,7 +97,7 @@ Window {
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: root.splitMode ? 10 : 0
-        Behavior on spacing { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+        Behavior on spacing { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
 
         Rectangle {
             width: root.leftWidth
@@ -94,9 +105,9 @@ Window {
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
-            Behavior on radius { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
-            Behavior on color { ColorAnimation { duration: 220 } }
-            Behavior on opacity { NumberAnimation { duration: 180 } }
+            Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+            Behavior on color { ColorAnimation { duration: root.animationDuration } }
+            Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
 
             Row {
                 anchors.left: parent.left
@@ -121,7 +132,7 @@ Window {
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: startMouse.containsMouse ? 1.1 : 1
-                        Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
@@ -158,7 +169,7 @@ Window {
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: taskMouse.containsMouse ? 1.1 : 1
-                        Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
@@ -191,7 +202,7 @@ Window {
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.iconSurfaceColor
                         scale: searchMouse.containsMouse ? 1.1 : 1
-                        Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                         Text { anchors.centerIn: parent; text: "⌕"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: Math.max(20, Math.round(root.iconSize * 0.55)) }
                     }
                     Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; text: "Search"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
@@ -206,9 +217,9 @@ Window {
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
-            Behavior on radius { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
-            Behavior on color { ColorAnimation { duration: 220 } }
-            Behavior on opacity { NumberAnimation { duration: 180 } }
+            Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+            Behavior on color { ColorAnimation { duration: root.animationDuration } }
+            Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
 
             Row {
                 anchors.fill: parent
@@ -225,8 +236,8 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8
                     model: runningApps
-                    add: Transition { NumberAnimation { properties: "x,opacity"; from: 16; to: 0; duration: 220; easing.type: Easing.OutCubic } }
-                    displaced: Transition { NumberAnimation { properties: "x"; duration: 180; easing.type: Easing.InOutCubic } }
+                    add: Transition { NumberAnimation { properties: "x,opacity"; from: 16; to: 0; duration: root.animationDuration; easing.type: Easing.OutCubic } }
+                    displaced: Transition { NumberAnimation { properties: "x"; duration: root.fadeAnimationDuration; easing.type: Easing.InOutCubic } }
                     delegate: Item {
                         id: runningDelegate
                         width: root.buttonWidth
@@ -243,8 +254,8 @@ Window {
                             color: root.iconSurfaceColor
                             opacity: runningMouse.containsMouse ? 1 : 0.94
                             scale: runningMouse.containsMouse ? 1.1 : 1
-                            Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
-                            Behavior on opacity { NumberAnimation { duration: 130 } }
+                            Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
+                            Behavior on opacity { NumberAnimation { duration: root.fastAnimationDuration } }
                             Image { id: runningImage; anchors.fill: parent; anchors.margins: 6; source: model.iconSource; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
                             Text { anchors.centerIn: parent; text: model.title.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: Math.max(17, Math.round(root.iconSize * 0.4)); font.bold: true; visible: runningImage.status !== Image.Ready }
                             Rectangle { width: Math.max(18, Math.round(root.iconSize * 0.48)); height: 3; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; radius: 2; color: model.active ? root.accentColor : "transparent" }
@@ -271,15 +282,17 @@ Window {
         }
 
         Rectangle {
+            id: trayPanel
             width: root.rightWidth
             height: 76
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
             clip: true
-            Behavior on radius { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
-            Behavior on color { ColorAnimation { duration: 220 } }
-            Behavior on opacity { NumberAnimation { duration: 180 } }
+            visible: root.trayEnabled
+            Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+            Behavior on color { ColorAnimation { duration: root.animationDuration } }
+            Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
 
             Component {
                 id: trayDelegate
@@ -291,7 +304,7 @@ Window {
                     property real pressX: 0
                     property real pressY: 0
                     scale: trayMouse.containsMouse ? 1.12 : 1
-                    Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                     Rectangle { anchors.centerIn: parent; width: root.trayIconSize + 4; height: root.trayIconSize + 4; radius: 7; color: root.iconSurfaceColor }
                     Image { id: trayImage; anchors.centerIn: parent; width: root.trayIconSize; height: root.trayIconSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 1 }
                     Text { anchors.centerIn: parent; text: model.tooltip.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize + 2; font.bold: true; visible: trayImage.status !== Image.Ready }
@@ -307,7 +320,7 @@ Window {
                         onPressed: { if (mouse.button === Qt.RightButton) { root.openTrayContextMenu(model.key); return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false }
                         onPositionChanged: if (Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5) trayItem.dragged = true
                         onReleased: if (trayItem.dragged) { var position = root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX; var columns = Math.max(1, Math.floor((root.trayListWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4)); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) }
-                        onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) trayIcons.activate(model.key, 0); trayItem.dragged = false }
+                        onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) { trayIcons.activate(model.key, 0); if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout() } trayItem.dragged = false }
                     }
                 }
             }
@@ -356,7 +369,7 @@ Window {
                 Item {
                     width: root.clockWidth
                     height: 76
-                    visible: root.clockEnabled
+                    visible: root.trayEnabled && root.clockEnabled
                     Column {
                         anchors.left: parent.left
                         anchors.right: parent.right
@@ -401,15 +414,15 @@ Window {
 
         ParallelAnimation {
             id: openAnimation
-            NumberAnimation { target: card; property: "opacity"; to: 1; duration: 180; easing.type: Easing.OutCubic }
-            NumberAnimation { target: card; property: "scale"; to: 1; duration: 220; easing.type: Easing.OutBack }
+            NumberAnimation { target: card; property: "opacity"; to: 1; duration: root.fadeAnimationDuration; easing.type: Easing.OutCubic }
+            NumberAnimation { target: card; property: "scale"; to: 1; duration: root.animationDuration; easing.type: Easing.OutBack }
         }
 
         SequentialAnimation {
             id: closeAnimation
             ParallelAnimation {
-                NumberAnimation { target: card; property: "opacity"; to: 0; duration: 120; easing.type: Easing.InCubic }
-                NumberAnimation { target: card; property: "scale"; to: 0.96; duration: 120; easing.type: Easing.InCubic }
+                NumberAnimation { target: card; property: "opacity"; to: 0; duration: root.closeAnimationDuration; easing.type: Easing.InCubic }
+                NumberAnimation { target: card; property: "scale"; to: 0.96; duration: root.closeAnimationDuration; easing.type: Easing.InCubic }
             }
             ScriptAction { script: settingsWindow.visible = false }
         }
@@ -426,7 +439,7 @@ Window {
                 GradientStop { position: 0; color: "#F021355F" }
                 GradientStop { position: 1; color: "#F0121E3D" }
             }
-            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+            Behavior on scale { NumberAnimation { duration: root.animationDuration; easing.type: Easing.OutBack } }
 
             Rectangle { anchors.fill: parent; anchors.margins: -7; radius: 31; color: "#50050B19"; z: -1 }
 
@@ -456,7 +469,7 @@ Window {
                             height: 32
                             radius: 10
                             color: root.settingsTab === index ? root.accentColor : "#182947"
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on color { ColorAnimation { duration: root.shortAnimationDuration } }
                             Text { anchors.centerIn: parent; text: modelData; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11; font.bold: true }
                             MouseArea { anchors.fill: parent; onClicked: root.settingsTab = index }
                         }
@@ -491,7 +504,7 @@ Window {
                                         color: root.theme === index ? root.accentColor : "#182947"
                                         border.width: root.theme === index ? 2 : 0
                                         border.color: "#F3F6FF"
-                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                        Behavior on color { ColorAnimation { duration: root.shortAnimationDuration } }
                                         Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.topMargin: 14; text: modelData; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true }
                                         Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 15; width: 96; height: 9; radius: 5; color: root.theme === index ? "#F3F6FF" : index === 0 ? "#6D8DF4" : index === 1 ? "#58D3E8" : "#C28CFF" }
                                         MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTheme(index) }
@@ -555,6 +568,7 @@ Window {
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Wrap tray icons"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayWrapEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayWrapEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayWrapEnabled(!taskedSettings.trayWrapEnabled) } } }
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Scroll tray overflow"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayScrollEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayScrollEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayScrollEnabled(!taskedSettings.trayScrollEnabled) } } }
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Labels"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.labelsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.labelsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelsEnabled(!taskedSettings.labelsEnabled) } } }
+                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "System tray"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayEnabled(!taskedSettings.trayEnabled) } } }
                             }
                         }
                     }
@@ -574,8 +588,9 @@ Window {
                                 Item { width: parent.width - 164; height: 1 }
                                 Rectangle { width: 44; height: 24; radius: 12; anchors.verticalCenter: parent.verticalCenter; color: taskedSettings.secondsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.secondsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSecondsEnabled(!taskedSettings.secondsEnabled) } }
                             }
-                            Rectangle { width: parent.width; height: 78; radius: 14; color: "#182947"; Column { anchors.fill: parent; anchors.margins: 16; spacing: 5; Text { text: "Active task click"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Clicking the foreground task minimizes it; clicking another task activates it."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; wrapMode: Text.WordWrap; width: parent.width } } }
-                            Rectangle { width: parent.width; height: 78; radius: 14; color: "#182947"; Column { anchors.fill: parent; anchors.margins: 16; spacing: 5; Text { text: "Tray ordering"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Task activation never reorders tray or running-app items. Drag a task to change its order manually."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; wrapMode: Text.WordWrap; width: parent.width } } }
+                            Grid { width: parent.width; columns: 2; columnSpacing: 18; rowSpacing: 8; Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Task previews"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.previewsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.previewsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setPreviewsEnabled(!taskedSettings.previewsEnabled) } } } Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Animations"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.animationsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.animationsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setAnimationsEnabled(!taskedSettings.animationsEnabled) } } } }
+                            Rectangle { width: parent.width; height: 70; radius: 14; color: "#182947"; Column { anchors.fill: parent; anchors.margins: 16; spacing: 5; Text { text: "Active task click"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Clicking the foreground task minimizes it; clicking another task activates it."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; wrapMode: Text.WordWrap; width: parent.width } } }
+                            Rectangle { width: parent.width; height: 70; radius: 14; color: "#182947"; Column { anchors.fill: parent; anchors.margins: 16; spacing: 5; Text { text: "Tray ordering"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Task activation never reorders tray or running-app items. Drag a task to change its order manually."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; wrapMode: Text.WordWrap; width: parent.width } } }
                         }
                     }
 
@@ -714,7 +729,7 @@ Window {
                         height: root.trayIconSize + 4
                         Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                         Image { anchors.centerIn: parent; width: root.trayIconSize; height: root.trayIconSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
-                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: if (mouse.button === Qt.RightButton) root.openTrayContextMenu(model.key); onClicked: if (mouse.button === Qt.LeftButton) trayIcons.activate(model.key, 0) }
+                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: if (mouse.button === Qt.RightButton) root.openTrayContextMenu(model.key); onClicked: if (mouse.button === Qt.LeftButton) { trayIcons.activate(model.key, 0); if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout() } }
                     }
                 }
             }

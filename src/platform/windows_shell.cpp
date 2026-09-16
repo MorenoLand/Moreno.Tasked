@@ -370,6 +370,15 @@ TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
 }
 
 bool TrayModel::isOverflow(const QString &key) const { return overflowKeys.contains(key); }
+bool TrayModel::isSystemFlyoutItem(const QString &key) const
+{
+    bool ok = false;
+    const auto value = key.toULongLong(&ok);
+    const auto found = std::find_if(items.cbegin(), items.cend(), [value, ok](const Item &item) { return ok && item.key == value; });
+    if (found == items.cend()) return false;
+    const auto text = (found->tooltip + QLatin1Char(' ') + found->automationId).toLower();
+    return text.contains(QStringLiteral("volume")) || text.contains(QStringLiteral("sound")) || text.contains(QStringLiteral("speaker")) || text.contains(QStringLiteral("audio")) || text.contains(QStringLiteral("network")) || text.contains(QStringLiteral("wi-fi")) || text.contains(QStringLiteral("wifi")) || text.contains(QStringLiteral("internet")) || text.contains(QStringLiteral("bluetooth")) || text.contains(QStringLiteral("battery"));
+}
 void TrayModel::setOverflow(const QString &key, bool enabled)
 {
     if (key.isEmpty() || isOverflow(key) == enabled) return;

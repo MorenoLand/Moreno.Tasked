@@ -13,8 +13,11 @@ TaskedSettings::TaskedSettings(QObject *parent) : QObject(parent)
     taskButton = settings.value("layout/taskButtonEnabled", true).toBool();
     startButton = settings.value("layout/startButtonEnabled", true).toBool();
     labels = settings.value("layout/labelsEnabled", true).toBool();
+    tray = settings.value("layout/trayEnabled", true).toBool();
     trayWrap = settings.value("layout/trayWrapEnabled", true).toBool();
     trayScroll = settings.value("layout/trayScrollEnabled", false).toBool();
+    previews = settings.value("behavior/previewsEnabled", true).toBool();
+    animations = settings.value("behavior/animationsEnabled", true).toBool();
     themeValue = settings.value("style/theme", 0).toInt();
     font = settings.value("typography/fontFamily", "Segoe UI").toString();
     label = settings.value("typography/labelSize", 9).toInt();
@@ -34,8 +37,11 @@ bool TaskedSettings::dividersEnabled() const { return dividers; }
 bool TaskedSettings::taskButtonEnabled() const { return taskButton; }
 bool TaskedSettings::startButtonEnabled() const { return startButton; }
 bool TaskedSettings::labelsEnabled() const { return labels; }
+bool TaskedSettings::trayEnabled() const { return tray; }
 bool TaskedSettings::trayWrapEnabled() const { return trayWrap; }
 bool TaskedSettings::trayScrollEnabled() const { return trayScroll; }
+bool TaskedSettings::previewsEnabled() const { return previews; }
+bool TaskedSettings::animationsEnabled() const { return animations; }
 int TaskedSettings::theme() const { return themeValue; }
 QString TaskedSettings::fontFamily() const { return font; }
 int TaskedSettings::labelSize() const { return label; }
@@ -68,8 +74,11 @@ void TaskedSettings::setDividersEnabled(bool enabled) { if (dividers == enabled)
 void TaskedSettings::setTaskButtonEnabled(bool enabled) { if (taskButton == enabled) return; taskButton = enabled; QSettings().setValue("layout/taskButtonEnabled", taskButton); emit taskButtonEnabledChanged(); }
 void TaskedSettings::setStartButtonEnabled(bool enabled) { if (startButton == enabled) return; startButton = enabled; QSettings().setValue("layout/startButtonEnabled", startButton); emit startButtonEnabledChanged(); }
 void TaskedSettings::setLabelsEnabled(bool enabled) { if (labels == enabled) return; labels = enabled; QSettings().setValue("layout/labelsEnabled", labels); emit labelsEnabledChanged(); }
+void TaskedSettings::setTrayEnabled(bool enabled) { if (tray == enabled) return; tray = enabled; QSettings().setValue("layout/trayEnabled", tray); emit trayEnabledChanged(); }
 void TaskedSettings::setTrayWrapEnabled(bool enabled) { if (trayWrap == enabled) return; trayWrap = enabled; QSettings().setValue("layout/trayWrapEnabled", trayWrap); emit trayWrapEnabledChanged(); }
 void TaskedSettings::setTrayScrollEnabled(bool enabled) { if (trayScroll == enabled) return; trayScroll = enabled; QSettings().setValue("layout/trayScrollEnabled", trayScroll); emit trayScrollEnabledChanged(); }
+void TaskedSettings::setPreviewsEnabled(bool enabled) { if (previews == enabled) return; previews = enabled; QSettings().setValue("behavior/previewsEnabled", previews); emit previewsEnabledChanged(); }
+void TaskedSettings::setAnimationsEnabled(bool enabled) { if (animations == enabled) return; animations = enabled; QSettings().setValue("behavior/animationsEnabled", animations); emit animationsEnabledChanged(); }
 void TaskedSettings::setTheme(int value) { value = qBound(0, value, 2); if (themeValue == value) return; themeValue = value; QSettings().setValue("style/theme", themeValue); emit themeChanged(); }
 void TaskedSettings::setFontFamily(const QString &value) { if (value.isEmpty() || font == value) return; font = value; QSettings().setValue("typography/fontFamily", font); emit fontFamilyChanged(); }
 void TaskedSettings::setLabelSize(int value) { value = qBound(8, value, 16); if (label == value) return; label = value; QSettings().setValue("typography/labelSize", label); emit labelSizeChanged(); }
@@ -81,5 +90,5 @@ void TaskedSettings::setBackgroundOpacity(int value) { value = qBound(0, value, 
 void TaskedSettings::setCornerRadius(int value) { value = qBound(10, value, 32); if (radius == value) return; radius = value; QSettings().setValue("style/cornerRadius", radius); emit cornerRadiusChanged(); }
 void TaskedSettings::reset()
 {
-    setSplitMode(false); setSearchEnabled(false); setClockEnabled(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(16); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
+    setSplitMode(false); setSearchEnabled(false); setClockEnabled(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setPreviewsEnabled(true); setAnimationsEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(16); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
 }

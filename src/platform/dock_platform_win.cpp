@@ -31,6 +31,9 @@ QTimer *startPositionTimer = nullptr;
 QRect startAnchor;
 int startPositionMisses = 0;
 bool startMenuOpen = false;
+QTimer *trayFlyoutTimer = nullptr;
+QRect trayFlyoutAnchor;
+int trayFlyoutMisses = 0;
 
 HWND nativeHandle(QWindow *window) { return reinterpret_cast<HWND>(window->winId()); }
 void positionDock();
@@ -82,6 +85,21 @@ bool isStartExperience(HWND window)
     const auto ok = QueryFullProcessImageNameW(process, 0, path.data(), &length);
     CloseHandle(process);
     return ok && _wcsicmp(wcsrchr(path.data(), L'\\') ? wcsrchr(path.data(), L'\\') + 1 : path.data(), L"StartMenuExperienceHost.exe") == 0;
+}
+
+bool isShellExperience(HWND window)
+{
+    DWORD processId = 0;
+    GetWindowThreadProcessId(window, &processId);
+    const auto process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!process) return false;
+    std::array<wchar_t, MAX_PATH> path{};
+    DWORD length = static_cast<DWORD>(path.size());
+    const auto ok = QueryFullProcessImageNameW(process, 0, path.data(), &length);
+    CloseHandle(process);
+    const auto name = wcsrchr(path.data(), L'\\');
+    const auto executable = name ? name + 1 : path.data();
+    return ok && (_wcsicmp(executable, L"ShellExperienceHost.exe") == 0 || _wcsicmp(executable, L"StartMenuExperienceHost.exe") == 0);
 }
 
 BOOL CALLBACK findStartPopup(HWND window, LPARAM parameter)
@@ -145,6 +163,73 @@ HWND startPopup()
     EnumWindows(findStartPopup, reinterpret_cast<LPARAM>(&result));
     if (!result) EnumWindows(findStartPopupChildren, reinterpret_cast<LPARAM>(&result));
     return result;
+}
+
+BOOL CALLBACK findTrayFlyout(HWND window, LPARAM parameter)
+{
+    if (!IsWindowVisible(window) || !isShellExperience(window)) return TRUE;
+    wchar_t className[64]{};
+    wchar_t title[128]{};
+    GetClassNameW(window, className, ARRAYSIZE(className));
+    GetWindowTextW(window, title, ARRAYSIZE(title));
+    const auto popup = wcscmp(className, L"Xaml_WindowedPopupClass") == 0 && (wcscmp(title, L"PopupHost") == 0 || title[0] == L'\0');
+    const auto core = wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && (_wcsicmp(title, L"Quick Settings") == 0 || _wcsicmp(title, L"Network") == 0 || _wcsicmp(title, L"Volume") == 0);
+    if (popup || core) {
+        *reinterpret_cast<HWND *>(parameter) = window;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL CALLBACK findTrayFlyoutChild(HWND window, LPARAM parameter) { return findTrayFlyout(window, parameter); }
+BOOL CALLBACK findTrayFlyoutChildren(HWND window, LPARAM parameter)
+{
+    EnumChildWindows(window, findTrayFlyoutChild, parameter);
+    return *reinterpret_cast<HWND *>(parameter) == nullptr;
+}
+
+HWND systemTrayFlyout()
+{
+    HWND result = nullptr;
+    EnumWindows(findTrayFlyout, reinterpret_cast<LPARAM>(&result));
+    if (!result) EnumWindows(findTrayFlyoutChildren, reinterpret_cast<LPARAM>(&result));
+    return result;
+}
+
+bool positionTrayFlyout(const QRect &anchor)
+{
+    const auto popup = systemTrayFlyout();
+    if (!popup) return false;
+    RECT current{};
+    if (!GetWindowRect(popup, &current)) return false;
+    const auto monitor = MonitorFromPoint({ anchor.center().x(), anchor.top() }, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{ sizeof(info) };
+    GetMonitorInfoW(monitor, &info);
+    const auto width = current.right - current.left;
+    const auto height = current.bottom - current.top;
+    if (width <= 0 || height <= 0) return false;
+    auto x = anchor.right() - width;
+    x = (std::max)(info.rcWork.left + 8, (std::min)(x, info.rcWork.right - width - 8));
+    auto y = anchor.top() - height - 8;
+    if (y < info.rcWork.top + 8) y = anchor.bottom() + 8;
+    POINT position{ x, y };
+    if (GetWindowLongPtrW(popup, GWL_STYLE) & WS_CHILD) {
+        const auto parent = GetParent(popup);
+        if (parent) ScreenToClient(parent, &position);
+    }
+    return SetWindowPos(popup, HWND_TOP, position.x, position.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+}
+
+void trayFlyoutMonitor(const QRect &anchor)
+{
+    if (!trayFlyoutTimer) {
+        trayFlyoutTimer = new QTimer(qApp);
+        trayFlyoutTimer->setInterval(16);
+        QObject::connect(trayFlyoutTimer, &QTimer::timeout, [] { if (positionTrayFlyout(trayFlyoutAnchor)) trayFlyoutMisses = 0; else if (++trayFlyoutMisses > 60) trayFlyoutTimer->stop(); });
+    }
+    trayFlyoutAnchor = anchor;
+    trayFlyoutMisses = 0;
+    trayFlyoutTimer->start();
 }
 
 bool positionStartPopup(const QRect &anchor)
@@ -274,6 +359,8 @@ void tasked::platform::showStartMenu(const QRect &anchor)
     startMenuOpen = true;
     startPositionMonitor(anchor);
 }
+
+void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { trayFlyoutMonitor(anchor); }
 
 QRect tasked::platform::installDock(QWindow *visualWindow, int height)
 {

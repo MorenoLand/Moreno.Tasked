@@ -41,6 +41,7 @@ public:
     QPixmap icon(qulonglong key, const QSize &requestedSize) const;
     Q_INVOKABLE void activate(const QString &key, int action);
     Q_INVOKABLE bool isOverflow(const QString &key) const;
+    Q_INVOKABLE bool isSystemFlyoutItem(const QString &key) const;
     Q_INVOKABLE void setOverflow(const QString &key, bool enabled);
     void reorder(const QStringList &orderedKeys, bool overflowOnly);
 signals:

@@ -13,8 +13,11 @@ class TaskedSettings final : public QObject
     Q_PROPERTY(bool taskButtonEnabled READ taskButtonEnabled WRITE setTaskButtonEnabled NOTIFY taskButtonEnabledChanged)
     Q_PROPERTY(bool startButtonEnabled READ startButtonEnabled WRITE setStartButtonEnabled NOTIFY startButtonEnabledChanged)
     Q_PROPERTY(bool labelsEnabled READ labelsEnabled WRITE setLabelsEnabled NOTIFY labelsEnabledChanged)
+    Q_PROPERTY(bool trayEnabled READ trayEnabled WRITE setTrayEnabled NOTIFY trayEnabledChanged)
     Q_PROPERTY(bool trayWrapEnabled READ trayWrapEnabled WRITE setTrayWrapEnabled NOTIFY trayWrapEnabledChanged)
     Q_PROPERTY(bool trayScrollEnabled READ trayScrollEnabled WRITE setTrayScrollEnabled NOTIFY trayScrollEnabledChanged)
+    Q_PROPERTY(bool previewsEnabled READ previewsEnabled WRITE setPreviewsEnabled NOTIFY previewsEnabledChanged)
+    Q_PROPERTY(bool animationsEnabled READ animationsEnabled WRITE setAnimationsEnabled NOTIFY animationsEnabledChanged)
     Q_PROPERTY(int theme READ theme WRITE setTheme NOTIFY themeChanged)
     Q_PROPERTY(QString fontFamily READ fontFamily WRITE setFontFamily NOTIFY fontFamilyChanged)
     Q_PROPERTY(int labelSize READ labelSize WRITE setLabelSize NOTIFY labelSizeChanged)
@@ -34,8 +37,11 @@ public:
     bool taskButtonEnabled() const;
     bool startButtonEnabled() const;
     bool labelsEnabled() const;
+    bool trayEnabled() const;
     bool trayWrapEnabled() const;
     bool trayScrollEnabled() const;
+    bool previewsEnabled() const;
+    bool animationsEnabled() const;
     int theme() const;
     QString fontFamily() const;
     int labelSize() const;
@@ -53,8 +59,11 @@ public:
     Q_INVOKABLE void setTaskButtonEnabled(bool enabled);
     Q_INVOKABLE void setStartButtonEnabled(bool enabled);
     Q_INVOKABLE void setLabelsEnabled(bool enabled);
+    Q_INVOKABLE void setTrayEnabled(bool enabled);
     Q_INVOKABLE void setTrayWrapEnabled(bool enabled);
     Q_INVOKABLE void setTrayScrollEnabled(bool enabled);
+    Q_INVOKABLE void setPreviewsEnabled(bool enabled);
+    Q_INVOKABLE void setAnimationsEnabled(bool enabled);
     Q_INVOKABLE void setTheme(int value);
     Q_INVOKABLE void setFontFamily(const QString &value);
     Q_INVOKABLE void setLabelSize(int value);
@@ -74,8 +83,11 @@ signals:
     void taskButtonEnabledChanged();
     void startButtonEnabledChanged();
     void labelsEnabledChanged();
+    void trayEnabledChanged();
     void trayWrapEnabledChanged();
     void trayScrollEnabledChanged();
+    void previewsEnabledChanged();
+    void animationsEnabledChanged();
     void themeChanged();
     void fontFamilyChanged();
     void labelSizeChanged();
@@ -94,8 +106,11 @@ private:
     bool taskButton = true;
     bool startButton = true;
     bool labels = true;
+    bool tray = true;
     bool trayWrap = false;
     bool trayScroll = false;
+    bool previews = true;
+    bool animations = true;
     int themeValue = 0;
     QString font = "Segoe UI";
     int label = 9;
