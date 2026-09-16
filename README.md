@@ -7,7 +7,7 @@ The primary target is taskbar replacement, not a floating toolbar. On Windows, T
 ## Project direction
 
 - One self-contained Tasked executable
-- Optional extensions loaded from an `extensions` directory
+- Optional extensions discovered and configured from an `extensions` directory
 - Built-in QML and visual resources embedded into the executable
 - Platform-specific shell integration behind small native adapters
 - User-configurable startup with the operating system
