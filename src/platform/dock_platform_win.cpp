@@ -510,7 +510,7 @@ void tasked::platform::showRunDialog(const QRect &anchor)
     runPositionMonitor(anchor);
 }
 
-void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { openQuickSettings(); trayFlyoutMonitor(anchor); }
+void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { trayFlyoutMonitor(anchor); openQuickSettings(); }
 
 QRect tasked::platform::installDock(QWindow *visualWindow, int height, int position)
 {
