@@ -130,7 +130,7 @@ Window {
         height: root.splitMode && root.spacedMode && root.verticalDock ? root.height - 28 : implicitHeight
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-        columns: root.verticalDock ? 1 : 4
+        columns: root.verticalDock ? 1 : (root.splitMode || !root.trayEnabled ? 4 : 3)
         columnSpacing: root.verticalDock ? 0 : root.splitSpreadGap
         rowSpacing: root.verticalDock ? root.splitSpreadGap : 0
 
@@ -835,11 +835,27 @@ Window {
                 Repeater {
                     model: overflowTrayIcons
                     delegate: Item {
+                        id: overflowItem
                         width: root.trayCellSize
                         height: root.trayCellSize
+                        property bool dragged: false
+                        property real pressX: 0
+                        property real pressY: 0
                         Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                         Image { anchors.centerIn: parent; width: root.trayPixelSize; height: root.trayPixelSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
-                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: { if (mouse.button === Qt.RightButton) { var point = parent.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)) } } onDoubleClicked: if (mouse.button === Qt.LeftButton) trayIcons.setOverflow(model.key, false); onClicked: if (mouse.button === Qt.LeftButton) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) } }
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            preventStealing: true
+                            drag.target: overflowItem
+                            drag.axis: Drag.XAndYAxis
+                            onPressed: { if (mouse.button === Qt.RightButton) { var point = parent.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false }
+                            onPositionChanged: if (pressed && (Math.abs(mouse.x - overflowItem.pressX) > 5 || Math.abs(mouse.y - overflowItem.pressY) > 5)) overflowItem.dragged = true
+                            onReleased: if (mouse.button === Qt.LeftButton && overflowItem.dragged) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close() }
+                            onDoubleClicked: if (mouse.button === Qt.LeftButton) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close() }
+                            onClicked: if (mouse.button === Qt.LeftButton && !overflowItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) }
+                            onCanceled: overflowItem.dragged = false
+                        }
                     }
                 }
             }
