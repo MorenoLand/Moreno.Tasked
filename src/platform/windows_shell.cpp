@@ -29,6 +29,17 @@ QHash<int, QByteArray> windowRoleNames() { return {{RunningAppsModel::TitleRole,
 QHash<int, QByteArray> trayRoleNames() { return {{TrayModel::KeyRole, "key"}, {TrayModel::TooltipRole, "tooltip"}}; }
 
 #ifdef Q_OS_WIN
+HWND traySpyWindow = nullptr;
+bool traySpyClassOwned = false;
+QVector<TrayModel::Item> observedTrayItems;
+
+#pragma pack(push, 4)
+struct ShellNotifyIconDataPrefix { quint32 callbackSize; quint32 owner; quint32 id; quint32 flags; quint32 callback; quint32 icon; wchar_t tooltip[128]; quint32 state; quint32 stateMask; wchar_t info[256]; quint32 version; };
+struct ShellTrayMessage { qint32 magic; quint32 messageType; ShellNotifyIconDataPrefix iconData; };
+#pragma pack(pop)
+
+LRESULT CALLBACK traySpyWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+
 QString processPath(HWND window)
 {
     DWORD processId = 0;
@@ -40,6 +51,129 @@ QString processPath(HWND window)
     const auto ok = QueryFullProcessImageNameW(process, 0, path.data(), &length);
     CloseHandle(process);
     return ok ? QString::fromWCharArray(path.data(), static_cast<int>(length)) : QString();
+}
+
+BOOL CALLBACK findRealTrayWindow(HWND window, LPARAM parameter)
+{
+    wchar_t className[64]{};
+    GetClassNameW(window, className, ARRAYSIZE(className));
+    if (window != traySpyWindow && wcscmp(className, L"Shell_TrayWnd") == 0) {
+        *reinterpret_cast<HWND *>(parameter) = window;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+HWND realTrayWindow()
+{
+    HWND result = nullptr;
+    EnumWindows(findRealTrayWindow, reinterpret_cast<LPARAM>(&result));
+    return result;
+}
+
+qulonglong observedTrayKey(qulonglong owner, quint32 id) { return owner ^ (static_cast<qulonglong>(id) << 32); }
+
+void observeTrayMessage(const COPYDATASTRUCT *copy)
+{
+    if (!copy || copy->dwData != 1 || !copy->lpData) return;
+    const auto *message = static_cast<const ShellTrayMessage *>(copy->lpData);
+    const auto owner = static_cast<qulonglong>(message->iconData.owner);
+    const auto id = message->iconData.id;
+    if (!owner) return;
+    const auto key = observedTrayKey(owner, id);
+    const auto found = std::find_if(observedTrayItems.begin(), observedTrayItems.end(), [owner, id](const TrayModel::Item &item) { return item.owner == owner && item.id == id; });
+    if (message->messageType == NIM_DELETE) {
+        if (found != observedTrayItems.end()) observedTrayItems.erase(found);
+        return;
+    }
+    auto update = found;
+    if (update == observedTrayItems.end()) {
+        TrayModel::Item item;
+        item.key = key;
+        item.owner = owner;
+        item.id = id;
+        observedTrayItems.append(item);
+        update = observedTrayItems.end() - 1;
+    }
+    const auto flags = message->iconData.flags;
+    update->owner = owner;
+    update->id = id;
+    if (flags & NIF_MESSAGE) update->callback = message->iconData.callback;
+    if (flags & NIF_ICON) update->icon = message->iconData.icon;
+    if (flags & NIF_TIP) {
+        const auto length = std::find(std::begin(message->iconData.tooltip), std::end(message->iconData.tooltip), wchar_t{}) - std::begin(message->iconData.tooltip);
+        update->tooltip = QString::fromWCharArray(message->iconData.tooltip, static_cast<int>(length));
+    }
+    if (message->iconData.version <= 4) update->version = message->iconData.version;
+}
+
+bool trayTextMatches(const QString &first, const QString &second)
+{
+    return !first.isEmpty() && !second.isEmpty() && (first.compare(second, Qt::CaseInsensitive) == 0 || first.contains(second, Qt::CaseInsensitive) || second.contains(first, Qt::CaseInsensitive));
+}
+
+void applyObservedTrayItems(QVector<TrayModel::Item> &next)
+{
+    QSet<qulonglong> used;
+    for (auto &item : next) {
+        auto found = std::find_if(observedTrayItems.cbegin(), observedTrayItems.cend(), [&item, &used](const TrayModel::Item &candidate) { return candidate.owner && !used.contains(candidate.key) && item.owner == candidate.owner && item.id == candidate.id; });
+        if (found == observedTrayItems.cend()) found = std::find_if(observedTrayItems.cbegin(), observedTrayItems.cend(), [&item, &used](const TrayModel::Item &candidate) { return candidate.owner && !used.contains(candidate.key) && trayTextMatches(item.tooltip, candidate.tooltip); });
+        if (found == observedTrayItems.cend()) continue;
+        used.insert(found->key);
+        item.owner = found->owner;
+        item.id = found->id;
+        item.callback = found->callback;
+        item.version = found->version;
+        if (found->icon) item.icon = found->icon;
+    }
+}
+
+LRESULT CALLBACK traySpyWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_COPYDATA) {
+        observeTrayMessage(reinterpret_cast<const COPYDATASTRUCT *>(lParam));
+        const auto real = realTrayWindow();
+        if (real) return SendMessageW(real, message, wParam, lParam);
+    }
+    if (message == WM_TIMER) {
+        SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        return 0;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+void installTraySpy()
+{
+    if (traySpyWindow) return;
+    const auto instance = GetModuleHandleW(nullptr);
+    WNDCLASSEXW windowClass{ sizeof(WNDCLASSEXW), 0, traySpyWindowProc, 0, 0, instance, nullptr, nullptr, nullptr, nullptr, L"Shell_TrayWnd", nullptr };
+    if (!RegisterClassExW(&windowClass)) {
+        if (GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return;
+    } else traySpyClassOwned = true;
+    traySpyWindow = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, L"Shell_TrayWnd", nullptr, WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance, nullptr);
+    if (!traySpyWindow) {
+        if (traySpyClassOwned) UnregisterClassW(L"Shell_TrayWnd", instance);
+        traySpyClassOwned = false;
+        return;
+    }
+    SetWindowPos(traySpyWindow, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetTimer(traySpyWindow, 1, 100, nullptr);
+    const auto taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
+    if (taskbarCreated) SendNotifyMessageW(HWND_BROADCAST, taskbarCreated, 0, 0);
+}
+
+void uninstallTraySpy()
+{
+    if (traySpyWindow) {
+        KillTimer(traySpyWindow, 1);
+        DestroyWindow(traySpyWindow);
+        traySpyWindow = nullptr;
+    }
+    if (traySpyClassOwned) {
+        UnregisterClassW(L"Shell_TrayWnd", GetModuleHandleW(nullptr));
+        traySpyClassOwned = false;
+    }
+    observedTrayItems.clear();
 }
 
 QPixmap iconFromPath(const QString &path, const QSize &requested)
@@ -128,7 +262,7 @@ QVector<TrayModel::Item> automationTrayItems(bool capture)
 {
     QVector<TrayModel::Item> result;
     auto *uiAutomation = automation();
-    const auto shell = FindWindowW(L"Shell_TrayWnd", nullptr);
+    const auto shell = realTrayWindow();
     if (!uiAutomation || !shell) return result;
     IUIAutomationElement *root = nullptr;
     if (FAILED(uiAutomation->ElementFromHandle(shell, &root))) return result;
@@ -244,7 +378,7 @@ QVector<HWND> trayToolbars()
     return bars;
 }
 
-struct RemoteTrayData { HWND owner; UINT id; UINT callback; HICON icon; };
+struct RemoteTrayData { HWND owner; UINT id; UINT callback; UINT state; UINT version; HICON icon; };
 
 void enumerateToolbar(HWND toolbar, QVector<TrayModel::Item> &items)
 {
@@ -267,7 +401,14 @@ void enumerateToolbar(HWND toolbar, QVector<TrayModel::Item> &items)
         if (!ReadProcessMemory(process, reinterpret_cast<const void *>(button.dwData), &tray, sizeof(tray), nullptr) || !tray.owner || !tray.callback) continue;
         const auto key = static_cast<qulonglong>(reinterpret_cast<quintptr>(tray.owner)) ^ (static_cast<qulonglong>(tray.id) << 32) ^ static_cast<qulonglong>(reinterpret_cast<quintptr>(toolbar));
         const auto path = processPath(tray.owner);
-        TrayModel::Item item{ key, static_cast<qulonglong>(reinterpret_cast<quintptr>(tray.owner)), tray.id, tray.callback, reinterpret_cast<quintptr>(tray.icon), path.isEmpty() ? QStringLiteral("Tray icon") : QFileInfo(path).fileName() };
+        TrayModel::Item item;
+        item.key = key;
+        item.owner = static_cast<qulonglong>(reinterpret_cast<quintptr>(tray.owner));
+        item.id = tray.id;
+        item.callback = tray.callback;
+        item.version = tray.version;
+        item.icon = reinterpret_cast<quintptr>(tray.icon);
+        item.tooltip = path.isEmpty() ? QStringLiteral("Tray icon") : QFileInfo(path).fileName();
         if (remoteRect) {
             RECT bounds{};
             if (SendMessageW(toolbar, TB_GETITEMRECT, index, reinterpret_cast<LPARAM>(remoteRect)) && ReadProcessMemory(process, remoteRect, &bounds, sizeof(bounds), nullptr)) {
@@ -293,6 +434,7 @@ void enrichTrayItems(QVector<TrayModel::Item> &items, const QVector<TrayModel::I
         item.owner = found->owner;
         item.id = found->id;
         item.callback = found->callback;
+        item.version = found->version;
         item.icon = found->icon;
     }
 }
@@ -416,6 +558,9 @@ void RunningAppsModel::close(const QString &windowHandle)
 
 TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
 {
+#ifdef Q_OS_WIN
+    installTraySpy();
+#endif
     overflowKeys = QSettings().value("tray/overflowKeys").toStringList();
     trayOrder = QSettings().value("tray/order").toStringList();
     connect(&timer, &QTimer::timeout, this, &TrayModel::refresh);
@@ -501,6 +646,7 @@ void TrayModel::reorder(const QStringList &orderedKeys, bool overflowOnly)
 TrayModel::~TrayModel()
 {
 #ifdef Q_OS_WIN
+    uninstallTraySpy();
     releaseAutomationItems(items);
 #endif
 }
@@ -521,7 +667,7 @@ QHash<int, QByteArray> TrayModel::roleNames() const { return trayRoleNames(); }
 void TrayModel::refresh()
 {
 #ifdef Q_OS_WIN
-    const auto shell = FindWindowW(L"Shell_TrayWnd", nullptr);
+    const auto shell = realTrayWindow();
     const auto recover = shell && !IsWindowVisible(shell) && items.isEmpty();
     if (recover) {
         ShowWindow(shell, SW_SHOWNOACTIVATE);
@@ -538,6 +684,7 @@ void TrayModel::refresh()
             return;
         }
     } else enrichTrayItems(next, native);
+    applyObservedTrayItems(next);
     if (!items.isEmpty() && !next.isEmpty()) {
         QVector<Item> ordered;
         QSet<qulonglong> placed;
@@ -558,7 +705,7 @@ void TrayModel::refresh()
     }
     if (next.size() == items.size()) {
         bool same = true;
-        for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).image.isNull() != items.at(i).image.isNull()) { same = false; break; }
+        for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).owner != items.at(i).owner || next.at(i).id != items.at(i).id || next.at(i).callback != items.at(i).callback || next.at(i).version != items.at(i).version || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).image.isNull() != items.at(i).image.isNull()) { same = false; break; }
         if (same) {
             releaseAutomationItems(next);
             if (recover) ShowWindow(shell, SW_HIDE);
@@ -603,9 +750,21 @@ void TrayModel::showContextMenu(const QString &key, int x, int y)
     if (!ok || found == items.cend() || !found->owner || !found->callback) return;
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
     if (!IsWindow(owner)) return;
-    SetForegroundWindow(owner);
-    SendMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
-    PostMessageW(owner, WM_NULL, 0, 0);
+    DWORD processId = 0;
+    GetWindowThreadProcessId(owner, &processId);
+    AllowSetForegroundWindow(processId);
+    const auto send = [&](UINT message) {
+        WPARAM wParam = found->id;
+        LPARAM lParam = MAKELPARAM(static_cast<WORD>(message), 0);
+        if (found->version > 3) {
+            wParam = MAKELPARAM(static_cast<WORD>(x), static_cast<WORD>(y));
+            lParam = MAKELPARAM(static_cast<WORD>(message), static_cast<WORD>(found->id));
+        }
+        SendNotifyMessageW(owner, found->callback, wParam, lParam);
+    };
+    send(WM_RBUTTONDOWN);
+    send(WM_RBUTTONUP);
+    if (found->version >= 3) send(WM_CONTEXTMENU);
 #else
     Q_UNUSED(key);
     Q_UNUSED(x);

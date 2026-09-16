@@ -33,7 +33,7 @@ class TrayModel final : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    struct Item { qulonglong key = 0; qulonglong owner = 0; quint32 id = 0; quint32 callback = 0; quintptr icon = 0; QString tooltip; QImage image; QString automationId; int ordinal = 0; quintptr automationElement = 0; QRect bounds; };
+    struct Item { qulonglong key = 0; qulonglong owner = 0; quint32 id = 0; quint32 callback = 0; quint32 version = 0; quintptr icon = 0; QString tooltip; QImage image; QString automationId; int ordinal = 0; quintptr automationElement = 0; QRect bounds; };
     enum Role { KeyRole = Qt::UserRole + 1, TooltipRole };
     explicit TrayModel(QObject *parent = nullptr);
     ~TrayModel() override;
