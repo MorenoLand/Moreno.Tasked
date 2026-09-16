@@ -378,33 +378,38 @@ Window {
                 columnSpacing: root.verticalDock ? 0 : 12
                 rowSpacing: root.verticalDock ? 12 : 0
 
-                ListView {
-                    width: root.trayWrapEnabled ? 0 : (root.verticalDock ? 76 : root.trayListWidth)
-                    height: root.trayWrapEnabled ? 0 : (root.verticalDock ? Math.max(1, root.trayListHeight) : 42)
-                    visible: !root.trayWrapEnabled
+                Item {
+                    id: trayContent
+                    width: root.verticalDock ? 76 : root.trayListWidth
+                    height: root.verticalDock ? Math.max(52, root.trayListHeight) : 52
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
-                    anchors.horizontalCenter: root.verticalDock ? parent.horizontalCenter : undefined
-                    clip: true
-                    interactive: root.trayScrollEnabled
-                    boundsBehavior: Flickable.StopAtBounds
-                    orientation: root.verticalDock ? ListView.Vertical : ListView.Horizontal
-                    spacing: 4
-                    id: trayList
-                    model: dockTrayIcons
-                    delegate: trayDelegate
-                }
-
-                Flow {
-                    width: root.trayWrapEnabled ? (root.verticalDock ? 76 : root.trayListWidth) : 0
-                    height: root.trayWrapEnabled ? (root.verticalDock ? Math.max(52, root.trayListHeight) : 52) : 0
-                    visible: root.trayWrapEnabled
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
-                    flow: root.verticalDock ? Flow.TopToBottom : Flow.LeftToRight
-                    clip: true
-                    spacing: 3
-                    Repeater { model: dockTrayIcons; delegate: trayDelegate }
+                    ListView {
+                        id: trayList
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: root.verticalDock ? 76 : root.trayListWidth
+                        height: root.verticalDock ? Math.max(1, root.trayListHeight) : 42
+                        visible: !root.trayWrapEnabled
+                        clip: true
+                        interactive: root.trayScrollEnabled
+                        boundsBehavior: Flickable.StopAtBounds
+                        orientation: root.verticalDock ? ListView.Vertical : ListView.Horizontal
+                        spacing: 4
+                        model: dockTrayIcons
+                        delegate: trayDelegate
+                    }
+                    Flow {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: root.verticalDock ? 76 : root.trayListWidth
+                        height: root.verticalDock ? Math.max(52, root.trayListHeight) : 52
+                        visible: root.trayWrapEnabled
+                        flow: root.verticalDock ? Flow.TopToBottom : Flow.LeftToRight
+                        clip: true
+                        spacing: 3
+                        Repeater { model: dockTrayIcons; delegate: trayDelegate }
+                    }
                 }
 
                 Item {
