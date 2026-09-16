@@ -482,7 +482,7 @@ Window {
         color: "transparent"
         transientParent: root
 
-        function positionPanel() { if (root.dockPosition === 1) { x = root.x + (root.width - width) / 2; y = root.y + root.height + 12 } else if (root.dockPosition === 2) { x = root.x + root.width + 12; y = root.y + (root.height - height) / 2 } else if (root.dockPosition === 3) { x = root.x - width - 12; y = root.y + (root.height - height) / 2 } else { x = root.x + (root.width - width) / 2; y = root.y - height - 12 } }
+        function positionPanel() { var pointX; var pointY; if (root.dockPosition === 1) { pointX = root.x + (root.width - width) / 2; pointY = root.y + root.height + 12 } else if (root.dockPosition === 2) { pointX = root.x + root.width + 12; pointY = root.y + (root.height - height) / 2 } else if (root.dockPosition === 3) { pointX = root.x - width - 12; pointY = root.y + (root.height - height) / 2 } else { pointX = root.x + (root.width - width) / 2; pointY = root.y - height - 12 } x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))) }
         function openPanel() { positionPanel(); show(); raise(); requestActivate(); card.opacity = 0; card.scale = 0.96; openAnimation.restart() }
         function closePanel() { if (visible) closeAnimation.restart() }
         onClosing: root.settingsOpen = false
@@ -788,7 +788,7 @@ Window {
         color: "transparent"
         transientParent: root
 
-        function openPanel() { var point = trayOverflowButton.mapToGlobal(0, 0); x = Math.round(point.x + (trayOverflowButton.width - width) / 2); y = Math.round(point.y - height - 10); if (y < 8) y = Math.round(point.y + trayOverflowButton.height + 10); show(); raise(); requestActivate() }
+        function openPanel() { var point = trayOverflowButton.mapToGlobal(0, 0); var pointX = point.x + (trayOverflowButton.width - width) / 2; var pointY = point.y - height - 10; if (pointY < Screen.virtualY + 8) pointY = point.y + trayOverflowButton.height + 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); show(); raise(); requestActivate() }
 
         Rectangle {
             anchors.fill: parent
@@ -832,7 +832,7 @@ Window {
         transientParent: root
         onActiveChanged: if (!active && visible) close()
 
-        function openMenu(globalX, globalY) { var pointX = globalX === undefined ? root.x + (root.width - width) / 2 : globalX - width / 2; var pointY = root.dockPosition === 1 ? root.y + root.height + 10 : root.verticalDock ? (globalY === undefined ? root.y + (root.height - height) / 2 : globalY - height / 2) : root.y - height - 10; x = Math.round(Math.max(8, pointX)); y = Math.round(Math.max(8, pointY)); show(); raise(); requestActivate() }
+        function openMenu(globalX, globalY) { var pointX = globalX === undefined ? root.x + (root.width - width) / 2 : globalX - width / 2; var pointY = root.dockPosition === 1 ? root.y + root.height + 10 : root.verticalDock ? (globalY === undefined ? root.y + (root.height - height) / 2 : globalY - height / 2) : root.y - height - 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); show(); raise(); requestActivate() }
 
         Rectangle {
             anchors.fill: parent
