@@ -427,7 +427,7 @@ Window {
                         Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.clock; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.clockSize; font.bold: true }
                         Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.date; color: "#BFCBEE"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                     }
-                    MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: root.openContextMenuAt(parent, mouse.x, mouse.y) }
+            MouseArea { anchors.fill: parent; z: -1; acceptedButtons: Qt.RightButton; onClicked: root.openContextMenuAt(parent, mouse.x, mouse.y) }
                 }
 
             }
