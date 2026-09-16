@@ -15,7 +15,7 @@ The primary target is taskbar replacement, not a floating toolbar. On Windows, T
 
 ## Current state
 
-The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a configurable Combined/Split bottom dock, native executable icons, running-window/tray enumeration, and the first Styling settings surface. Explorer taskbar replacement is being validated in the Windows-first build.
+The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a configurable Combined/Split bottom dock, native executable icons, running-window/tray enumeration, Start-menu access, adaptive tray sizing with an overflow popup, independent background opacity, and tabbed Layout, Behavior, Theme, and Typography settings. Explorer taskbar replacement is being validated in the Windows-first build.
 
 ## Build
 

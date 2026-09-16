@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QRect>
 #include <QSet>
+#include <QSettings>
 #include <QUrl>
 
 #ifdef Q_OS_WIN
@@ -333,6 +334,11 @@ void RunningAppsModel::activate(const QString &windowHandle)
     const auto value = windowHandle.toULongLong(&ok);
     const auto window = reinterpret_cast<HWND>(static_cast<quintptr>(value));
     if (ok && IsWindow(window)) {
+        const auto active = std::any_of(items.cbegin(), items.cend(), [window](const Item &item) { return item.window == static_cast<qulonglong>(reinterpret_cast<quintptr>(window)) && item.active; });
+        if (active || GetForegroundWindow() == window) {
+            ShowWindow(window, SW_MINIMIZE);
+            return;
+        }
         if (IsIconic(window)) ShowWindow(window, SW_RESTORE);
         SetForegroundWindow(window);
         BringWindowToTop(window);
@@ -356,9 +362,19 @@ void RunningAppsModel::close(const QString &windowHandle)
 
 TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
 {
+    overflowKeys = QSettings().value("tray/overflowKeys").toStringList();
     connect(&timer, &QTimer::timeout, this, &TrayModel::refresh);
     timer.start(1000);
     refresh();
+}
+
+bool TrayModel::isOverflow(const QString &key) const { return overflowKeys.contains(key); }
+void TrayModel::setOverflow(const QString &key, bool enabled)
+{
+    if (key.isEmpty() || isOverflow(key) == enabled) return;
+    if (enabled) overflowKeys.append(key); else overflowKeys.removeAll(key);
+    QSettings().setValue("tray/overflowKeys", overflowKeys);
+    emit overflowChanged();
 }
 
 TrayModel::~TrayModel()
@@ -471,3 +487,19 @@ void TrayModel::activate(const QString &key, int action)
     Q_UNUSED(action);
 #endif
 }
+
+TrayFilterModel::TrayFilterModel(TrayModel *source, bool overflow, QObject *parent) : QSortFilterProxyModel(parent), tray(source), overflowOnly(overflow)
+{
+    setSourceModel(source);
+    connect(source, &TrayModel::overflowChanged, this, &TrayFilterModel::refreshFilter);
+    connect(this, &QAbstractItemModel::modelReset, this, &TrayFilterModel::countChanged);
+}
+
+bool TrayFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const
+{
+    if (!tray) return false;
+    const auto key = tray->data(tray->index(sourceRow, 0, sourceParent), TrayModel::KeyRole).toString();
+    return tray->isOverflow(key) == overflowOnly;
+}
+
+void TrayFilterModel::refreshFilter() { invalidateFilter(); emit countChanged(); }

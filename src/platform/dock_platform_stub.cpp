@@ -6,6 +6,7 @@
 #include <algorithm>
 
 void tasked::platform::prepareTaskbarSnapshot() {}
+void tasked::platform::showStartMenu(const QRect &) {}
 
 QRect tasked::platform::installDock(QWindow *, int height)
 {

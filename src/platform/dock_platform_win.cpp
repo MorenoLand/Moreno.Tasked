@@ -2,15 +2,21 @@
 
 #include <QAbstractNativeEventFilter>
 #include <QCoreApplication>
+#include <QRect>
 #include <QProcess>
 #include <QStringList>
+#include <QTimer>
 #include <QVector>
 #include <QWindow>
 
 #include <windows.h>
 #include <shellapi.h>
+#include <UIAutomation.h>
+#include <oleauto.h>
 
 #include <algorithm>
+#include <array>
+#include <cwchar>
 
 namespace {
 constexpr UINT callbackMessage = WM_APP + 0x47;
@@ -21,6 +27,10 @@ QVector<HWND> hiddenTaskbars;
 int dockHeight = 92;
 UINT taskbarCreatedMessage = 0;
 bool takeover = false;
+QTimer *startPositionTimer = nullptr;
+QRect startAnchor;
+int startPositionMisses = 0;
+bool startMenuOpen = false;
 
 HWND nativeHandle(QWindow *window) { return reinterpret_cast<HWND>(window->winId()); }
 void positionDock();
@@ -61,6 +71,152 @@ void restoreTaskbars()
 
 void restoreAllTaskbars() { EnumWindows(restoreTaskbarWindow, 0); }
 
+bool isStartExperience(HWND window)
+{
+    DWORD processId = 0;
+    GetWindowThreadProcessId(window, &processId);
+    const auto process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!process) return false;
+    std::array<wchar_t, MAX_PATH> path{};
+    DWORD length = static_cast<DWORD>(path.size());
+    const auto ok = QueryFullProcessImageNameW(process, 0, path.data(), &length);
+    CloseHandle(process);
+    return ok && _wcsicmp(wcsrchr(path.data(), L'\\') ? wcsrchr(path.data(), L'\\') + 1 : path.data(), L"StartMenuExperienceHost.exe") == 0;
+}
+
+BOOL CALLBACK findStartPopup(HWND window, LPARAM parameter)
+{
+    wchar_t className[64]{};
+    wchar_t title[64]{};
+    GetClassNameW(window, className, ARRAYSIZE(className));
+    GetWindowTextW(window, title, ARRAYSIZE(title));
+    const auto startWindow = wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && wcscmp(title, L"Start") == 0;
+    if (startWindow || (isStartExperience(window) && (wcscmp(className, L"Xaml_WindowedPopupClass") == 0 || wcscmp(title, L"PopupHost") == 0))) {
+        *reinterpret_cast<HWND *>(parameter) = window;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+QRect startPanelBounds(HWND host)
+{
+    const auto initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    IUIAutomation *uiAutomation = nullptr;
+    IUIAutomationElement *root = nullptr;
+    IUIAutomationCondition *condition = nullptr;
+    IUIAutomationElement *element = nullptr;
+    QRect result;
+    if (SUCCEEDED(CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&uiAutomation))) && uiAutomation && SUCCEEDED(uiAutomation->ElementFromHandle(host, &root)) && root) {
+        VARIANT value{};
+        value.vt = VT_BSTR;
+        value.bstrVal = SysAllocString(L"StartMenuPinnedList");
+        if (value.bstrVal && SUCCEEDED(uiAutomation->CreatePropertyCondition(UIA_AutomationIdPropertyId, value, &condition)) && condition && SUCCEEDED(root->FindFirst(TreeScope_Descendants, condition, &element)) && element) {
+            BOOL offscreen = TRUE;
+            RECT bounds{};
+            if (SUCCEEDED(element->get_CurrentIsOffscreen(&offscreen)) && !offscreen && SUCCEEDED(element->get_CurrentBoundingRectangle(&bounds)) && bounds.right > bounds.left && bounds.bottom > bounds.top) {
+                const auto monitor = MonitorFromRect(&bounds, MONITOR_DEFAULTTONEAREST);
+                MONITORINFO info{ sizeof(info) };
+                if (GetMonitorInfoW(monitor, &info) && bounds.right > info.rcMonitor.left && bounds.left < info.rcMonitor.right && bounds.bottom > info.rcMonitor.top && bounds.top < info.rcMonitor.bottom) result = QRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+            }
+        }
+        if (value.bstrVal) SysFreeString(value.bstrVal);
+    }
+    if (element) element->Release();
+    if (condition) condition->Release();
+    if (root) root->Release();
+    if (uiAutomation) uiAutomation->Release();
+    if (initialized == S_OK || initialized == S_FALSE) CoUninitialize();
+    return result;
+}
+
+BOOL CALLBACK findStartPopupChild(HWND window, LPARAM parameter) { return findStartPopup(window, parameter); }
+
+BOOL CALLBACK findStartPopupChildren(HWND window, LPARAM parameter)
+{
+    EnumChildWindows(window, findStartPopupChild, parameter);
+    return *reinterpret_cast<HWND *>(parameter) == nullptr;
+}
+
+HWND startPopup()
+{
+    if (const auto result = FindWindowW(L"Windows.UI.Core.CoreWindow", L"Start")) return result;
+    if (const auto result = FindWindowW(L"Xaml_WindowedPopupClass", L"PopupHost")) return result;
+    HWND result = nullptr;
+    EnumWindows(findStartPopup, reinterpret_cast<LPARAM>(&result));
+    if (!result) EnumWindows(findStartPopupChildren, reinterpret_cast<LPARAM>(&result));
+    return result;
+}
+
+bool positionStartPopup(const QRect &anchor)
+{
+    const auto popup = startPopup();
+    if (!popup) return false;
+    RECT current{};
+    if (!GetWindowRect(popup, &current)) return false;
+    wchar_t className[64]{};
+    wchar_t title[64]{};
+    GetClassNameW(popup, className, ARRAYSIZE(className));
+    GetWindowTextW(popup, title, ARRAYSIZE(title));
+    if (wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && wcscmp(title, L"Start") == 0) {
+        const auto panel = startPanelBounds(popup);
+        if (!panel.isValid() && startPositionMisses > 30 && GetForegroundWindow() != popup) return false;
+        const auto scale = static_cast<int>(GetDpiForWindow(popup)) / 96.0;
+        const auto panelWidth = panel.isValid() ? panel.width() : static_cast<int>(642 * scale);
+        const auto panelLeft = panel.isValid() ? panel.left() : current.left + static_cast<int>(12 * scale);
+        const auto monitor = MonitorFromPoint({ anchor.center().x(), anchor.top() }, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO info{ sizeof(info) };
+        GetMonitorInfoW(monitor, &info);
+        const auto minimumX = static_cast<int>(info.rcWork.left + 8);
+        const auto maximumX = static_cast<int>(info.rcWork.right - panelWidth - 8);
+        auto panelX = anchor.center().x() - panelWidth / 2;
+        panelX = (std::max)(minimumX, (std::min)(panelX, maximumX));
+        const auto x = current.left + panelX - panelLeft;
+        const auto moved = SetWindowPos(popup, nullptr, x, current.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+        return moved;
+    }
+    const auto monitor = MonitorFromPoint({ anchor.center().x(), anchor.top() }, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{ sizeof(info) };
+    GetMonitorInfoW(monitor, &info);
+    const auto width = current.right - current.left;
+    const auto height = current.bottom - current.top;
+    const auto minimumX = info.rcWork.left + 8;
+    const auto maximumX = info.rcWork.right - width - 8;
+    auto x = anchor.center().x() - width / 2;
+    x = (std::max)(minimumX, (std::min)(x, maximumX));
+    auto y = anchor.top() - height - 10;
+    if (y < info.rcWork.top + 8) y = anchor.bottom() + 10;
+    POINT position{ x, y };
+    if (GetWindowLongPtrW(popup, GWL_STYLE) & WS_CHILD) {
+        const auto parent = GetParent(popup);
+        if (parent) ScreenToClient(parent, &position);
+    }
+    return SetWindowPos(popup, HWND_TOP, position.x, position.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+}
+
+bool startMenuIsOpen() { const auto popup = startPopup(); return popup && IsWindowVisible(popup) && startPanelBounds(popup).isValid(); }
+void sendKey(WORD key)
+{
+    INPUT input[2]{};
+    input[0].type = INPUT_KEYBOARD;
+    input[0].ki.wVk = key;
+    input[1].type = INPUT_KEYBOARD;
+    input[1].ki.wVk = key;
+    input[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(2, input, sizeof(INPUT));
+}
+
+void startPositionMonitor(const QRect &anchor)
+{
+    if (!startPositionTimer) {
+        startPositionTimer = new QTimer(qApp);
+        startPositionTimer->setInterval(16);
+        QObject::connect(startPositionTimer, &QTimer::timeout, [] { const auto positioned = positionStartPopup(startAnchor); if (startMenuIsOpen()) { startMenuOpen = true; startPositionMisses = 0; } else if (!positioned || ++startPositionMisses > 30) { startMenuOpen = false; startPositionTimer->stop(); } });
+    }
+    startAnchor = anchor;
+    startPositionMisses = 0;
+    startPositionTimer->start();
+}
+
 bool startTaskbarGuard()
 {
     return QProcess::startDetached(QCoreApplication::applicationFilePath(), { "--tasked-taskbar-guard", QString::number(GetCurrentProcessId()) });
@@ -99,12 +255,25 @@ void positionDock()
     SHAppBarMessage(ABM_SETPOS, &data);
     reservation->setGeometry(data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top);
     if (!visual) return;
-    const auto width = (std::min)(1080, (std::max)(320, reservation->width() - 32));
+    const auto maximumWidth = (std::max)(320, reservation->width() - 32);
+    const auto width = (std::min)(maximumWidth, (std::max)(320, visual->width()));
     visual->setGeometry(data.rc.left + (reservation->width() - width) / 2, monitor.rcMonitor.bottom - visual->height() - 12, width, visual->height());
 }
 }
 
 void tasked::platform::prepareTaskbarSnapshot() { restoreAllTaskbars(); }
+void tasked::platform::showStartMenu(const QRect &anchor)
+{
+    if (startMenuOpen || startMenuIsOpen()) {
+        if (startPositionTimer) startPositionTimer->stop();
+        sendKey(VK_ESCAPE);
+        startMenuOpen = false;
+        return;
+    }
+    sendKey(VK_LWIN);
+    startMenuOpen = true;
+    startPositionMonitor(anchor);
+}
 
 QRect tasked::platform::installDock(QWindow *visualWindow, int height)
 {
@@ -126,6 +295,7 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height)
     SHAppBarMessage(ABM_NEW, &data);
     eventFilter = new DockEventFilter;
     qApp->installNativeEventFilter(eventFilter);
+    QObject::connect(visual, &QWindow::widthChanged, visual, [](int) { positionDock(); });
     positionDock();
     return visual->geometry();
 }

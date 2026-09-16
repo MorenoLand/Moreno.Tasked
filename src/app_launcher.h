@@ -8,4 +8,5 @@ class AppLauncher final : public QObject
 public:
     using QObject::QObject;
     Q_INVOKABLE bool launch(const QString &target);
+    Q_INVOKABLE void showStartMenu(int x, int y, int width, int height);
 };

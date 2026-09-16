@@ -6,6 +6,7 @@
 
 #include "app_launcher.h"
 #include "app_settings.h"
+#include "preview_controller.h"
 #include "platform/dock_platform.h"
 #include "platform/tray_icon_provider.h"
 #include "platform/windows_shell.h"
@@ -23,14 +24,20 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     AppLauncher launcher;
     TaskedSettings taskedSettings;
+    PreviewController previewController;
     RunningAppsModel runningApps;
     TrayModel trayIcons;
+    TrayFilterModel dockTrayIcons(&trayIcons, false);
+    TrayFilterModel overflowTrayIcons(&trayIcons, true);
     engine.addImageProvider("shell", new ShellIconProvider);
     engine.addImageProvider("tray", new TrayIconProvider(&trayIcons));
     engine.rootContext()->setContextProperty("launcher", &launcher);
     engine.rootContext()->setContextProperty("taskedSettings", &taskedSettings);
+    engine.rootContext()->setContextProperty("previewController", &previewController);
     engine.rootContext()->setContextProperty("runningApps", &runningApps);
     engine.rootContext()->setContextProperty("trayIcons", &trayIcons);
+    engine.rootContext()->setContextProperty("dockTrayIcons", &dockTrayIcons);
+    engine.rootContext()->setContextProperty("overflowTrayIcons", &overflowTrayIcons);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
     engine.loadFromModule("Tasked", "Main");
     if (engine.rootObjects().isEmpty()) return -1;

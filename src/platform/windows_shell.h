@@ -3,6 +3,8 @@
 #include <QAbstractListModel>
 #include <QImage>
 #include <QPixmap>
+#include <QSortFilterProxyModel>
+#include <QStringList>
 #include <QTimer>
 #include <QVector>
 
@@ -38,8 +40,30 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     QPixmap icon(qulonglong key, const QSize &requestedSize) const;
     Q_INVOKABLE void activate(const QString &key, int action);
+    Q_INVOKABLE bool isOverflow(const QString &key) const;
+    Q_INVOKABLE void setOverflow(const QString &key, bool enabled);
+signals:
+    void overflowChanged();
 private:
     void refresh();
     QVector<Item> items;
+    QStringList overflowKeys;
     QTimer timer;
+};
+
+class TrayFilterModel final : public QSortFilterProxyModel
+{
+    Q_OBJECT
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+public:
+    TrayFilterModel(TrayModel *source, bool overflow, QObject *parent = nullptr);
+    int count() const { return rowCount(); }
+signals:
+    void countChanged();
+protected:
+    bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
+private:
+    void refreshFilter();
+    TrayModel *tray = nullptr;
+    bool overflowOnly = false;
 };
