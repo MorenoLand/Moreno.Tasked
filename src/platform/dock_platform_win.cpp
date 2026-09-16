@@ -234,7 +234,13 @@ BOOL CALLBACK findTrayFlyout(HWND window, LPARAM parameter)
     GetClassNameW(window, className, ARRAYSIZE(className));
     GetWindowTextW(window, title, ARRAYSIZE(title));
     const auto popup = isShellExperience(window) && wcscmp(className, L"Xaml_WindowedPopupClass") == 0 && (wcscmp(title, L"PopupHost") == 0 || title[0] == L'\0');
-    const auto core = isShellExperience(window) && wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && (_wcsicmp(title, L"Quick Settings") == 0 || _wcsicmp(title, L"Network") == 0 || _wcsicmp(title, L"Volume") == 0);
+    RECT bounds{};
+    GetWindowRect(window, &bounds);
+    const auto width = bounds.right - bounds.left;
+    const auto height = bounds.bottom - bounds.top;
+    const auto titledCore = _wcsicmp(title, L"Quick Settings") == 0 || _wcsicmp(title, L"Control Center") == 0 || _wcsicmp(title, L"Network") == 0 || _wcsicmp(title, L"Volume") == 0;
+    const auto untitledCore = title[0] == L'\0' && width >= 200 && width <= 1000 && height >= 150 && height <= 1000;
+    const auto core = isShellExperience(window) && wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && (titledCore || untitledCore);
     if (popup || core) {
         *reinterpret_cast<HWND *>(parameter) = window;
         return FALSE;
