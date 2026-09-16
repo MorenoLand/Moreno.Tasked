@@ -50,6 +50,30 @@ bool isDesktopWindow(HWND window);
 void sendShortcut(WORD modifier, WORD key);
 void sendQuickSettingsHotkey();
 
+bool taskbarHasTrayButtons()
+{
+    const auto shell = FindWindowW(L"Shell_TrayWnd", nullptr);
+    if (!shell || !IsWindowVisible(shell)) return false;
+    const auto initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    IUIAutomation *uiAutomation = nullptr;
+    IUIAutomationElement *root = nullptr;
+    IUIAutomationCondition *condition = nullptr;
+    IUIAutomationElementArray *elements = nullptr;
+    int length = 0;
+    if (SUCCEEDED(CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&uiAutomation))) && uiAutomation && SUCCEEDED(uiAutomation->ElementFromHandle(shell, &root)) && root) {
+        VARIANT value{};
+        value.vt = VT_I4;
+        value.lVal = UIA_ButtonControlTypeId;
+        if (SUCCEEDED(uiAutomation->CreatePropertyCondition(UIA_ControlTypePropertyId, value, &condition)) && condition && SUCCEEDED(root->FindAll(TreeScope_Descendants, condition, &elements)) && elements) elements->get_Length(&length);
+    }
+    if (elements) elements->Release();
+    if (condition) condition->Release();
+    if (root) root->Release();
+    if (uiAutomation) uiAutomation->Release();
+    if (initialized == S_OK || initialized == S_FALSE) CoUninitialize();
+    return length > 0;
+}
+
 void updateFullscreenVisibility()
 {
     if (!visual) return;
@@ -494,7 +518,11 @@ void positionDock()
 }
 }
 
-void tasked::platform::prepareTaskbarSnapshot() { restoreAllTaskbars(); }
+void tasked::platform::prepareTaskbarSnapshot()
+{
+    restoreAllTaskbars();
+    for (int attempt = 0; attempt < 30 && !taskbarHasTrayButtons(); ++attempt) Sleep(50);
+}
 void tasked::platform::showStartMenu(const QRect &anchor)
 {
     if (startMenuOpen || startMenuIsOpen()) {
