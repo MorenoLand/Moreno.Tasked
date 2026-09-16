@@ -512,7 +512,10 @@ void TrayModel::refresh()
 #ifdef Q_OS_WIN
     const auto shell = FindWindowW(L"Shell_TrayWnd", nullptr);
     const auto recover = shell && !IsWindowVisible(shell) && items.isEmpty();
-    if (recover) ShowWindow(shell, SW_SHOWNOACTIVATE);
+    if (recover) {
+        ShowWindow(shell, SW_SHOWNOACTIVATE);
+        Sleep(250);
+    }
     const auto visible = shell && IsWindowVisible(shell);
     QVector<Item> next = automationTrayItems(visible);
     QVector<Item> native;
