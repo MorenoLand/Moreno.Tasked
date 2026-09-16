@@ -389,10 +389,14 @@ void RunningAppsModel::showTaskMenu(const QString &windowHandle, int x, int y)
     if (!ok || !IsWindow(window)) return;
     const auto menu = GetSystemMenu(window, FALSE);
     if (!menu) return;
+    const auto targetThread = GetWindowThreadProcessId(window, nullptr);
+    const auto currentThread = GetCurrentThreadId();
+    const auto attached = targetThread && targetThread != currentThread && AttachThreadInput(currentThread, targetThread, TRUE);
     SetForegroundWindow(window);
-    const auto command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, x, y, 0, window, nullptr);
+    const auto command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, x, y, window, nullptr);
     PostMessageW(window, WM_NULL, 0, 0);
     if (command) PostMessageW(window, WM_SYSCOMMAND, command, 0);
+    if (attached) AttachThreadInput(currentThread, targetThread, FALSE);
 #else
     Q_UNUSED(windowHandle);
     Q_UNUSED(x);
@@ -602,11 +606,8 @@ void TrayModel::showContextMenu(const QString &key, int x, int y)
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
     if (!IsWindow(owner)) return;
     SetForegroundWindow(owner);
-    PostMessageW(owner, found->callback, found->id, WM_RBUTTONDOWN);
     PostMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
-    const auto anchor = static_cast<WPARAM>(MAKELPARAM(static_cast<WORD>(x), static_cast<WORD>(y)));
-    const auto context = static_cast<LPARAM>(MAKELPARAM(WM_CONTEXTMENU, static_cast<WORD>(found->id)));
-    PostMessageW(owner, found->callback, anchor, context);
+    PostMessageW(owner, WM_NULL, 0, 0);
 #else
     Q_UNUSED(key);
     Q_UNUSED(x);
