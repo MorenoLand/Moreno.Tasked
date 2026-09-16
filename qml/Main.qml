@@ -374,8 +374,8 @@ Window {
                 rowSpacing: root.verticalDock ? 12 : 0
 
                 ListView {
-                    width: root.verticalDock ? 76 : root.trayListWidth
-                    height: root.verticalDock ? Math.max(1, root.trayListHeight) : 42
+                    width: root.trayWrapEnabled ? 0 : (root.verticalDock ? 76 : root.trayListWidth)
+                    height: root.trayWrapEnabled ? 0 : (root.verticalDock ? Math.max(1, root.trayListHeight) : 42)
                     visible: !root.trayWrapEnabled
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
@@ -391,8 +391,8 @@ Window {
                 }
 
                 Flow {
-                    width: root.verticalDock ? 76 : root.trayListWidth
-                    height: root.verticalDock ? Math.max(52, root.trayListHeight) : 52
+                    width: root.trayWrapEnabled ? (root.verticalDock ? 76 : root.trayListWidth) : 0
+                    height: root.trayWrapEnabled ? (root.verticalDock ? Math.max(52, root.trayListHeight) : 52) : 0
                     visible: root.trayWrapEnabled
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
@@ -404,9 +404,9 @@ Window {
 
                 Item {
                     id: trayOverflowButton
-                    width: root.verticalDock ? 76 : root.overflowButtonWidth
-                    height: root.trayCellSize
                     visible: overflowTrayIcons.count > 0 || !root.dockLocked
+                    width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
+                    height: visible ? root.trayCellSize : 0
                     anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
                     Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                     Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
@@ -414,9 +414,9 @@ Window {
                 }
 
                 Item {
-                    height: 76
-                    width: root.verticalDock ? 76 : root.clockWidth
                     visible: root.trayEnabled && !root.splitMode && root.clockEnabled
+                    height: visible ? 76 : 0
+                    width: visible ? (root.verticalDock ? 76 : root.clockWidth) : 0
                     Column {
                         anchors.left: parent.left
                         anchors.right: parent.right
