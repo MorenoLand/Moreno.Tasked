@@ -377,12 +377,13 @@ Window {
             }
 
             Grid {
+                id: trayGrid
                 anchors.fill: parent
                 anchors.leftMargin: root.verticalDock ? 0 : 16
-                anchors.rightMargin: root.verticalDock ? 0 : 16 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
-                anchors.topMargin: root.verticalDock ? root.dockSidePadding : 0
-                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? 76 + 12 : 0) : 0
-                columns: root.verticalDock ? 1 : 2
+                anchors.rightMargin: root.verticalDock ? 0 : 16 + root.overflowButtonWidth + 12 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
+                anchors.topMargin: root.verticalDock ? root.dockSidePadding : 12
+                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + root.overflowButtonWidth + 12 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? 76 + 12 : 0) : 12
+                columns: 1
                 columnSpacing: root.verticalDock ? 0 : 12
                 rowSpacing: root.verticalDock ? 12 : 0
 
@@ -420,17 +421,21 @@ Window {
                     }
                 }
 
-                Item {
-                    id: trayOverflowButton
-                    visible: root.trayEnabled
-                    width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
-                    height: visible ? root.trayCellSize : 0
-                    anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
-                    Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
-                    Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
-                    MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.openPanel() }
-                }
-
+            }
+            Item {
+                id: trayOverflowButton
+                visible: root.trayEnabled
+                width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
+                height: visible ? root.trayCellSize : 0
+                anchors.right: root.verticalDock ? undefined : parent.right
+                anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
+                anchors.horizontalCenter: root.verticalDock ? parent.horizontalCenter : undefined
+                anchors.bottom: root.verticalDock ? (combinedClock.visible ? combinedClock.top : parent.bottom) : undefined
+                anchors.bottomMargin: root.verticalDock && combinedClock.visible ? 12 : 0
+                anchors.verticalCenterOffset: root.verticalDock ? 0 : (root.labelsEnabled ? 0 : 6)
+                Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
+                Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
+                MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.openPanel() }
             }
             Item {
                 id: combinedClock
