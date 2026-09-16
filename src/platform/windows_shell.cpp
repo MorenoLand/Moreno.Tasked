@@ -361,14 +361,19 @@ void RunningAppsModel::activate(const QString &windowHandle)
     const auto value = windowHandle.toULongLong(&ok);
     const auto window = reinterpret_cast<HWND>(static_cast<quintptr>(value));
     if (ok && IsWindow(window)) {
-        const auto active = std::any_of(items.cbegin(), items.cend(), [window](const Item &item) { return item.window == static_cast<qulonglong>(reinterpret_cast<quintptr>(window)) && item.active; });
-        if (active || GetForegroundWindow() == window) {
-            ShowWindow(window, SW_MINIMIZE);
+        const auto foreground = GetForegroundWindow();
+        if (!IsIconic(window) && foreground == window) {
+            ShowWindowAsync(window, SW_MINIMIZE);
             return;
         }
-        if (IsIconic(window)) ShowWindow(window, SW_RESTORE);
-        SetForegroundWindow(window);
+        const auto targetThread = GetWindowThreadProcessId(window, nullptr);
+        const auto currentThread = GetCurrentThreadId();
+        const auto attached = targetThread && targetThread != currentThread && AttachThreadInput(currentThread, targetThread, TRUE);
+        ShowWindowAsync(window, SW_RESTORE);
         BringWindowToTop(window);
+        SetForegroundWindow(window);
+        if (GetForegroundWindow() != window) SwitchToThisWindow(window, TRUE);
+        if (attached) AttachThreadInput(currentThread, targetThread, FALSE);
     }
 #else
     Q_UNUSED(windowHandle);

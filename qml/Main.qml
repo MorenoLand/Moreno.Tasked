@@ -77,10 +77,10 @@ Window {
     property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? 76 : 0)
     property bool splitSpreadMode: splitMode && spacedMode
     property int splitMiddleOffsetX: splitSpreadMode && !verticalDock ? Math.round((dock.width - middleWidth) / 2 - leftWidth - sectionGap) : 0
-    property int splitTrayOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - rightWidth - sectionGap - leftWidth - middleWidth - sectionGap) : 0
+    property int splitTrayOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - rightWidth - leftWidth - middleWidth - sectionGap * 3) : 0
     property int splitClockOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - leftWidth - middleWidth - rightWidth - sectionGap * 3) : 0
     property int splitMiddleOffsetY: splitSpreadMode && verticalDock ? Math.round((dock.height - middleHeight) / 2 - leftHeight - sectionGap) : 0
-    property int splitTrayOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - (clockSectionVisible ? 76 : 0) - (trayEnabled ? trayHeight : 0) - sectionGap - leftHeight - middleHeight - sectionGap) : 0
+    property int splitTrayOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - (clockSectionVisible ? 76 : 0) - (trayEnabled ? trayHeight : 0) - leftHeight - middleHeight - sectionGap * 3) : 0
     property int splitClockOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - 76 - leftHeight - middleHeight - (trayEnabled ? trayHeight : 0) - sectionGap * 3) : 0
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
