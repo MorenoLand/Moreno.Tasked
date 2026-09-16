@@ -20,6 +20,7 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
     Q_INVOKABLE void activate(const QString &windowHandle);
+    Q_INVOKABLE void showTaskMenu(const QString &windowHandle, int x, int y);
     Q_INVOKABLE void close(const QString &windowHandle);
     Q_INVOKABLE void move(int from, int to);
 private:

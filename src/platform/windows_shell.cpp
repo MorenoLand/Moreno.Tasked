@@ -374,6 +374,25 @@ void RunningAppsModel::activate(const QString &windowHandle)
 #endif
 }
 
+void RunningAppsModel::showTaskMenu(const QString &windowHandle, int x, int y)
+{
+#ifdef Q_OS_WIN
+    bool ok = false;
+    const auto value = windowHandle.toULongLong(&ok);
+    const auto window = reinterpret_cast<HWND>(static_cast<quintptr>(value));
+    if (!ok || !IsWindow(window)) return;
+    const auto menu = GetSystemMenu(window, FALSE);
+    if (!menu) return;
+    SetForegroundWindow(window);
+    const auto command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, x, y, 0, window, nullptr);
+    if (command) PostMessageW(window, WM_SYSCOMMAND, command, 0);
+#else
+    Q_UNUSED(windowHandle);
+    Q_UNUSED(x);
+    Q_UNUSED(y);
+#endif
+}
+
 void RunningAppsModel::close(const QString &windowHandle)
 {
 #ifdef Q_OS_WIN
@@ -560,11 +579,13 @@ void TrayModel::activate(const QString &key, int action)
     const auto found = std::find_if(items.cbegin(), items.cend(), [value](const Item &item) { return item.key == value; });
     if (!ok || found == items.cend()) return;
     if (found->automationElement) {
-        if (action == 1 && found->owner && found->callback) {
-            const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
-            SetForegroundWindow(owner);
-            PostMessageW(owner, found->callback, found->id, WM_RBUTTONDOWN);
-            PostMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
+        if (action == 1) {
+            if (found->owner && found->callback) {
+                const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
+                SetForegroundWindow(owner);
+                PostMessageW(owner, found->callback, found->id, WM_RBUTTONDOWN);
+                PostMessageW(owner, found->callback, found->id, WM_RBUTTONUP);
+            }
         } else if (action != 3) invokeAutomationItem(found->automationElement);
         return;
     }

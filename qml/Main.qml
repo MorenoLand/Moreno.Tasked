@@ -58,7 +58,7 @@ Window {
     property int leftWidth: verticalDock ? (visibleButtonCount > 0 ? 76 : 0) : (visibleButtonCount > 0 ? buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2 : 0)
     property int leftHeight: verticalDock ? (visibleButtonCount > 0 ? Math.max(76, visibleButtonCount * 76 + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) - 1) * 8 + dockSidePadding * 2) : 0) : 76
     property int clockWidth: clockEnabled ? (secondsEnabled ? 98 : 78) : 0
-    property int overflowButtonWidth: overflowTrayIcons.count > 0 ? trayIconSize + 4 : 0
+    property int overflowButtonWidth: overflowTrayIcons.count > 0 || !dockLocked ? trayIconSize + 4 : 0
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * (trayIconSize + 4) - 4)
     property int trayPixelSize: Math.max(12, Math.round(trayIconSize * trayScale))
     property int trayCellSize: trayPixelSize + 4
@@ -304,7 +304,7 @@ Window {
                             property real pressX: 0
                             onEntered: root.schedulePreview(model.windowHandle, runningDelegate, model.title)
                             onExited: root.closePreview()
-                            onPressed: { if (mouse.button === Qt.RightButton) { root.openContextMenuAt(runningMouse, mouse.x, mouse.y); return } pressX = mouse.x; runningDelegate.dragged = false }
+                            onPressed: { if (mouse.button === Qt.RightButton) { var point = runningMouse.mapToGlobal(mouse.x, mouse.y); runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } pressX = mouse.x; runningDelegate.dragged = false }
                             onPositionChanged: if (Math.abs(mouse.x - pressX) > 6) runningDelegate.dragged = true
                             onReleased: if (runningDelegate.dragged) { var target = Math.round((runningDelegate.x + runningDelegate.width / 2) / (runningDelegate.width + runningList.spacing)); target = Math.max(0, Math.min(runningList.count - 1, target)); runningApps.move(index, target) }
                             onClicked: { root.closePreview(); if (mouse.button === Qt.LeftButton && !runningDelegate.dragged) runningApps.activate(model.windowHandle); runningDelegate.dragged = false }
@@ -356,7 +356,7 @@ Window {
                         onEntered: trayIcons.activate(model.key, 3)
                         onPressed: { if (mouse.button === Qt.RightButton) { trayIcons.activate(model.key, 1); return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false }
                         onPositionChanged: if (Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5) trayItem.dragged = true
-                        onReleased: if (trayItem.dragged) { var position = root.verticalDock ? trayItem.y + trayList.contentY : (root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX); var columns = Math.max(1, Math.floor((root.trayListWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.verticalDock ? Math.round((position + trayItem.height / 2) / (trayItem.height + 4)) : (root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4))); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) }
+                        onReleased: if (trayItem.dragged) { var overflowPoint = trayItem.mapToItem(trayOverflowButton, trayItem.width / 2, trayItem.height / 2); if (trayOverflowButton.visible && overflowPoint.x >= 0 && overflowPoint.x <= trayOverflowButton.width && overflowPoint.y >= 0 && overflowPoint.y <= trayOverflowButton.height) trayIcons.setOverflow(model.key, true); else { var position = root.verticalDock ? trayItem.y + trayList.contentY : (root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX); var columns = Math.max(1, Math.floor((root.trayListWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.verticalDock ? Math.round((position + trayItem.height / 2) / (trayItem.height + 4)) : (root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4))); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) } }
                         onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) { trayIcons.activate(model.key, 0); if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout() } trayItem.dragged = false }
                     }
                 }
@@ -405,7 +405,7 @@ Window {
                     id: trayOverflowButton
                     width: root.verticalDock ? 76 : root.overflowButtonWidth
                     height: root.trayIconSize + 4
-                    visible: overflowTrayIcons.count > 0
+                    visible: overflowTrayIcons.count > 0 || !root.dockLocked
                     anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
                     Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                     Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
@@ -807,7 +807,7 @@ Window {
                         height: root.trayIconSize + 4
                         Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                         Image { anchors.centerIn: parent; width: root.trayIconSize; height: root.trayIconSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
-                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: if (mouse.button === Qt.RightButton) trayIcons.activate(model.key, 1); onClicked: if (mouse.button === Qt.LeftButton) { trayIcons.activate(model.key, 0); if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout() } }
+                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: if (mouse.button === Qt.RightButton) trayIcons.activate(model.key, 1); onDoubleClicked: if (mouse.button === Qt.LeftButton) trayIcons.setOverflow(model.key, false); onClicked: if (mouse.button === Qt.LeftButton) { trayIcons.activate(model.key, 0); if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout() } }
                     }
                 }
             }
