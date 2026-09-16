@@ -5,6 +5,7 @@
 #include <QRect>
 #include <QSet>
 #include <QSettings>
+#include <QThread>
 #include <QUrl>
 
 #ifdef Q_OS_WIN
@@ -412,7 +413,10 @@ TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
     trayOrder = QSettings().value("tray/order").toStringList();
     connect(&timer, &QTimer::timeout, this, &TrayModel::refresh);
     timer.start(1000);
-    refresh();
+    for (int attempt = 0; attempt < 10 && items.isEmpty(); ++attempt) {
+        refresh();
+        if (items.isEmpty()) QThread::msleep(100);
+    }
 }
 
 bool TrayModel::isOverflow(const QString &key) const { return overflowKeys.contains(key); }
