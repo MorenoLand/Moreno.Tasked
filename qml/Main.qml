@@ -85,8 +85,8 @@ Window {
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 11 : 18
-    property int preferredDockWidth: Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1) + (splitSpreadMode && !verticalDock ? 28 : 0))
-    property int preferredDockHeight: Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1) + (splitSpreadMode && verticalDock ? 28 : 0))
+    property int preferredDockWidth: splitSpreadMode && !verticalDock ? Math.max(1080, Screen.width - 32) : Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
+    property int preferredDockHeight: splitSpreadMode && verticalDock ? Math.max(320, Screen.height - 32) : Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1))
     property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
     property string clock: Qt.formatTime(new Date(), clockFormat)
     property string date: Qt.formatDate(new Date(), "MMM d")
@@ -311,9 +311,9 @@ Window {
                             Behavior on opacity { NumberAnimation { duration: root.fastAnimationDuration } }
                             Image { id: runningImage; anchors.fill: parent; anchors.margins: 6; source: model.iconSource; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
                             Text { anchors.centerIn: parent; text: model.title.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: Math.max(17, Math.round(root.iconSize * 0.4)); font.bold: true; visible: runningImage.status !== Image.Ready }
-                            Rectangle { width: 6; height: 6; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 2; radius: 3; color: root.accentColor }
                         }
-                        Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; width: runningDelegate.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
+                        Rectangle { width: 6; height: 6; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: runningIcon.bottom; anchors.topMargin: 3; radius: 3; color: root.accentColor }
+                        Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 2; width: runningDelegate.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                         MouseArea {
                             id: runningMouse
                             anchors.fill: parent
