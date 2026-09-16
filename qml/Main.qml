@@ -71,7 +71,7 @@ Window {
     property int trayHeight: verticalDock && trayEnabled ? Math.max(76, trayListHeight + dockSidePadding * 2 + (overflowButtonWidth > 0 ? trayCellSize + 12 : 0) + (!splitMode && clockEnabled ? 76 + 12 : 0)) : 76
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
     property int middleHeight: Math.max(320, runningList.count * 76 + 28)
-    property int sectionGap: splitMode && spacedMode ? 10 : 0
+    property int sectionGap: spacedMode ? 10 : 0
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 11 : 18
@@ -98,6 +98,11 @@ Window {
     onPreviewsEnabledChanged: if (!previewsEnabled) root.closePreview()
     onPreferredDockWidthChanged: if (!verticalDock && width !== preferredDockWidth) width = preferredDockWidth
     onPreferredDockHeightChanged: if (verticalDock && height !== preferredDockHeight) height = preferredDockHeight
+
+    Connections {
+        target: taskedSettings
+        function onSectionOffsetsChanged() { leftPanel.freeX = taskedSettings.sectionOffsetX("left"); leftPanel.freeY = taskedSettings.sectionOffsetY("left"); middlePanel.freeX = taskedSettings.sectionOffsetX("middle"); middlePanel.freeY = taskedSettings.sectionOffsetY("middle"); trayPanel.freeX = taskedSettings.sectionOffsetX("tray"); trayPanel.freeY = taskedSettings.sectionOffsetY("tray"); clockPanel.freeX = taskedSettings.sectionOffsetX("clock"); clockPanel.freeY = taskedSettings.sectionOffsetY("clock") }
+    }
 
     Rectangle {
         id: solidSurface
@@ -318,8 +323,8 @@ Window {
 
         Rectangle {
             id: trayPanel
-            width: root.verticalDock ? 76 : root.rightWidth
-            height: root.verticalDock ? root.trayHeight : 76
+            width: root.trayEnabled ? (root.verticalDock ? 76 : root.rightWidth) : 0
+            height: root.trayEnabled ? (root.verticalDock ? root.trayHeight : 76) : 0
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
@@ -437,8 +442,8 @@ Window {
 
         Rectangle {
             id: clockPanel
-            width: root.verticalDock ? 76 : root.clockSectionWidth
-            height: 76
+            width: root.clockSectionVisible ? (root.verticalDock ? 76 : root.clockSectionWidth) : 0
+            height: root.clockSectionVisible ? 76 : 0
             visible: root.clockSectionVisible
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.sectionBackgroundColor
@@ -487,6 +492,8 @@ Window {
             function onXChanged() { if (settingsWindow.visible) settingsWindow.positionPanel() }
             function onYChanged() { if (settingsWindow.visible) settingsWindow.positionPanel() }
             function onWidthChanged() { if (settingsWindow.visible) settingsWindow.positionPanel() }
+            function onHeightChanged() { if (settingsWindow.visible) settingsWindow.positionPanel() }
+            function onDockPositionChanged() { if (settingsWindow.visible) settingsWindow.positionPanel() }
         }
 
         ParallelAnimation {

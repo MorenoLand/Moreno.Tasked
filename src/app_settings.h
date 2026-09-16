@@ -116,6 +116,7 @@ signals:
     void surfaceOpacityChanged();
     void backgroundOpacityChanged();
     void cornerRadiusChanged();
+    void sectionOffsetsChanged();
 private:
     bool split = false;
     bool spaced = true;

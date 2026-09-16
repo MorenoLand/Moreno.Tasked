@@ -107,4 +107,5 @@ void TaskedSettings::setCornerRadius(int value) { value = qBound(10, value, 32);
 void TaskedSettings::reset()
 {
     setSplitMode(false); setSpacedMode(true); setDockLocked(true); setDockPosition(0); setSectionOffset("left", 0, 0); setSectionOffset("middle", 0, 0); setSectionOffset("tray", 0, 0); setSectionOffset("clock", 0, 0); setSearchEnabled(false); setClockEnabled(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setPreviewsEnabled(true); setAnimationsEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(16); setTrayScale(100); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
+    emit sectionOffsetsChanged();
 }
