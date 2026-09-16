@@ -41,13 +41,14 @@ bool fullscreenHidden = false;
 HWND nativeHandle(QWindow *window) { return reinterpret_cast<HWND>(window->winId()); }
 void positionDock();
 bool isShellExperience(HWND window);
+bool isDesktopWindow(HWND window);
 
 void updateFullscreenVisibility()
 {
     if (!visual) return;
     const auto foreground = GetForegroundWindow();
     bool fullscreen = false;
-    if (foreground && foreground != nativeHandle(visual) && foreground != nativeHandle(reservation) && !isShellExperience(foreground)) {
+    if (foreground && foreground != nativeHandle(visual) && foreground != nativeHandle(reservation) && !isShellExperience(foreground) && !isDesktopWindow(foreground)) {
         RECT bounds{};
         const auto monitor = MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{ sizeof(info) };
@@ -63,6 +64,13 @@ bool isTaskbar(HWND window)
     wchar_t className[64]{};
     GetClassNameW(window, className, ARRAYSIZE(className));
     return wcscmp(className, L"Shell_TrayWnd") == 0 || wcscmp(className, L"Shell_SecondaryTrayWnd") == 0;
+}
+
+bool isDesktopWindow(HWND window)
+{
+    wchar_t className[64]{};
+    GetClassNameW(window, className, ARRAYSIZE(className));
+    return wcscmp(className, L"Progman") == 0 || wcscmp(className, L"WorkerW") == 0 || isTaskbar(window);
 }
 
 BOOL CALLBACK hideTaskbarWindow(HWND window, LPARAM)
