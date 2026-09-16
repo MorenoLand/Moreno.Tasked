@@ -72,15 +72,21 @@ Window {
     property int trayHeight: verticalDock && trayEnabled ? Math.max(76, trayListHeight + dockSidePadding * 2 + (overflowButtonWidth > 0 ? trayCellSize + 12 : 0) + (!splitMode && clockEnabled ? 76 + 12 : 0)) : 76
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
     property int middleHeight: Math.max(320, runningList.count * 76 + 28)
-    property int sectionGap: spacedMode ? 10 : 0
+    property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)
     property int horizontalContentWidth: leftWidth + middleWidth + rightWidth + clockSectionWidth
     property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? 76 : 0)
-    property int splitSpreadGap: splitMode && spacedMode ? (verticalDock ? Math.max(sectionGap, Math.floor((height - 28 - verticalContentHeight) / 3)) : Math.max(sectionGap, Math.floor((width - 28 - horizontalContentWidth) / 3))) : sectionGap
+    property bool splitSpreadMode: splitMode && spacedMode
+    property int splitMiddleOffsetX: splitSpreadMode && !verticalDock ? Math.round((dock.width - middleWidth) / 2 - leftWidth - sectionGap) : 0
+    property int splitTrayOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - rightWidth - sectionGap - leftWidth - middleWidth - sectionGap) : 0
+    property int splitClockOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - leftWidth - middleWidth - rightWidth - sectionGap * 3) : 0
+    property int splitMiddleOffsetY: splitSpreadMode && verticalDock ? Math.round((dock.height - middleHeight) / 2 - leftHeight - sectionGap) : 0
+    property int splitTrayOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - (clockSectionVisible ? 76 : 0) - (trayEnabled ? trayHeight : 0) - sectionGap - leftHeight - middleHeight - sectionGap) : 0
+    property int splitClockOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - 76 - leftHeight - middleHeight - (trayEnabled ? trayHeight : 0) - sectionGap * 3) : 0
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 11 : 18
-    property int preferredDockWidth: Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1) + (splitMode && spacedMode && !verticalDock ? 28 : 0))
-    property int preferredDockHeight: Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1) + (splitMode && spacedMode && verticalDock ? 28 : 0))
+    property int preferredDockWidth: Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1) + (splitSpreadMode && !verticalDock ? 28 : 0))
+    property int preferredDockHeight: Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1) + (splitSpreadMode && verticalDock ? 28 : 0))
     property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
     property string clock: Qt.formatTime(new Date(), clockFormat)
     property string date: Qt.formatDate(new Date(), "MMM d")
@@ -126,13 +132,13 @@ Window {
 
     Grid {
         id: dock
-        width: root.splitMode && root.spacedMode && !root.verticalDock ? root.width - 28 : implicitWidth
-        height: root.splitMode && root.spacedMode && root.verticalDock ? root.height - 28 : implicitHeight
+        width: root.splitSpreadMode && !root.verticalDock ? root.width - 28 : implicitWidth
+        height: root.splitSpreadMode && root.verticalDock ? root.height - 28 : implicitHeight
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         columns: root.verticalDock ? 1 : (root.splitMode || !root.trayEnabled ? 4 : 3)
-        columnSpacing: root.verticalDock ? 0 : root.splitSpreadGap
-        rowSpacing: root.verticalDock ? root.splitSpreadGap : 0
+        columnSpacing: root.verticalDock ? 0 : root.sectionGap
+        rowSpacing: root.verticalDock ? root.sectionGap : 0
 
         Rectangle {
             id: leftPanel
@@ -263,7 +269,7 @@ Window {
             opacity: 1
             property real freeX: taskedSettings.sectionOffsetX("middle")
             property real freeY: taskedSettings.sectionOffsetY("middle")
-            transform: Translate { x: root.dockLocked ? 0 : middlePanel.freeX; y: root.dockLocked ? 0 : middlePanel.freeY }
+            transform: Translate { x: root.splitMiddleOffsetX + (root.dockLocked ? 0 : middlePanel.freeX); y: root.splitMiddleOffsetY + (root.dockLocked ? 0 : middlePanel.freeY) }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
             Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
@@ -305,7 +311,7 @@ Window {
                             Behavior on opacity { NumberAnimation { duration: root.fastAnimationDuration } }
                             Image { id: runningImage; anchors.fill: parent; anchors.margins: 6; source: model.iconSource; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
                             Text { anchors.centerIn: parent; text: model.title.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: Math.max(17, Math.round(root.iconSize * 0.4)); font.bold: true; visible: runningImage.status !== Image.Ready }
-                            Rectangle { width: Math.max(18, Math.round(root.iconSize * 0.48)); height: 3; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; radius: 2; color: model.active ? root.accentColor : "transparent" }
+                            Rectangle { width: 6; height: 6; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 2; radius: 3; color: root.accentColor }
                         }
                         Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; width: runningDelegate.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                         MouseArea {
@@ -340,7 +346,7 @@ Window {
             visible: root.trayEnabled
             property real freeX: taskedSettings.sectionOffsetX("tray")
             property real freeY: taskedSettings.sectionOffsetY("tray")
-            transform: Translate { x: root.dockLocked ? 0 : trayPanel.freeX; y: root.dockLocked ? 0 : trayPanel.freeY }
+            transform: Translate { x: root.splitTrayOffsetX + (root.dockLocked ? 0 : trayPanel.freeX); y: root.splitTrayOffsetY + (root.dockLocked ? 0 : trayPanel.freeY) }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
             Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
@@ -428,6 +434,7 @@ Window {
                 width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
                 height: visible ? root.trayCellSize : 0
                 anchors.left: root.verticalDock ? undefined : parent.left
+                anchors.leftMargin: root.verticalDock ? 0 : 8
                 anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
                 anchors.horizontalCenter: root.verticalDock ? parent.horizontalCenter : undefined
                 anchors.bottom: root.verticalDock ? (combinedClock.visible ? combinedClock.top : parent.bottom) : undefined
@@ -472,7 +479,7 @@ Window {
             opacity: 1
             property real freeX: taskedSettings.sectionOffsetX("clock")
             property real freeY: taskedSettings.sectionOffsetY("clock")
-            transform: Translate { x: root.dockLocked ? 0 : clockPanel.freeX; y: root.dockLocked ? 0 : clockPanel.freeY }
+            transform: Translate { x: root.splitClockOffsetX + (root.dockLocked ? 0 : clockPanel.freeX); y: root.splitClockOffsetY + (root.dockLocked ? 0 : clockPanel.freeY) }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
             Column {
