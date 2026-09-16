@@ -476,7 +476,7 @@ Window {
         color: "transparent"
         transientParent: root
 
-        function positionPanel() { x = root.x + (root.width - width) / 2; y = root.y - height - 12 }
+        function positionPanel() { if (root.dockPosition === 1) { x = root.x + (root.width - width) / 2; y = root.y + root.height + 12 } else if (root.dockPosition === 2) { x = root.x + root.width + 12; y = root.y + (root.height - height) / 2 } else if (root.dockPosition === 3) { x = root.x - width - 12; y = root.y + (root.height - height) / 2 } else { x = root.x + (root.width - width) / 2; y = root.y - height - 12 } }
         function openPanel() { positionPanel(); show(); raise(); requestActivate(); card.opacity = 0; card.scale = 0.96; openAnimation.restart() }
         function closePanel() { if (visible) closeAnimation.restart() }
         onClosing: root.settingsOpen = false

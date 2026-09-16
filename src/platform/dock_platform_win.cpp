@@ -187,13 +187,13 @@ HWND startPopup()
 
 BOOL CALLBACK findTrayFlyout(HWND window, LPARAM parameter)
 {
-    if (!IsWindowVisible(window) || !isShellExperience(window)) return TRUE;
+    if (!IsWindowVisible(window)) return TRUE;
     wchar_t className[64]{};
     wchar_t title[128]{};
     GetClassNameW(window, className, ARRAYSIZE(className));
     GetWindowTextW(window, title, ARRAYSIZE(title));
     const auto popup = wcscmp(className, L"Xaml_WindowedPopupClass") == 0 && (wcscmp(title, L"PopupHost") == 0 || title[0] == L'\0');
-    const auto core = wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && (_wcsicmp(title, L"Quick Settings") == 0 || _wcsicmp(title, L"Network") == 0 || _wcsicmp(title, L"Volume") == 0);
+    const auto core = isShellExperience(window) && wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && (_wcsicmp(title, L"Quick Settings") == 0 || _wcsicmp(title, L"Network") == 0 || _wcsicmp(title, L"Volume") == 0);
     if (popup || core) {
         *reinterpret_cast<HWND *>(parameter) = window;
         return FALSE;
