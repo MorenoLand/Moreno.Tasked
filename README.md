@@ -28,8 +28,8 @@ Requirements:
 From the project directory:
 
 ```powershell
-cmake -S . -B bin -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3-static-msvc2022_64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-cmake --build bin --parallel
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3-static-msvc2022_64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+cmake --build build --parallel
 ```
 
 The initial executable is `bin/Tasked.exe`.
