@@ -102,6 +102,7 @@ Window {
     function schedulePreview(handle, item, title) { if (!previewsEnabled) return; previewHandle = handle; previewTitle = title; previewItem = item; previewCloseTimer.stop(); previewOpenTimer.restart() }
     function openPreview() { if (!previewItem) return; var point = previewItem.mapToGlobal(0, 0); var x = point.x + (previewItem.width - previewWindow.width) / 2; var y = point.y - previewWindow.height - 12; if (y < 8) y = point.y + previewItem.height + 12; previewWindow.x = Math.round(x); previewWindow.y = Math.round(y); previewWindow.show(); previewWindow.raise(); previewController.show(previewHandle, previewWindow, previewWindow.width, previewWindow.height) }
     function closePreview() { previewOpenTimer.stop(); previewCloseTimer.restart() }
+    function dismissPreview() { previewOpenTimer.stop(); previewCloseTimer.stop(); previewController.hide(); previewWindow.hide() }
     property var previewItem: null
     Timer { id: previewOpenTimer; interval: 280; onTriggered: root.openPreview() }
     Timer { id: previewCloseTimer; interval: 140; onTriggered: { previewController.hide(); previewWindow.hide() } }
@@ -324,9 +325,9 @@ Window {
                             property real pressX: 0
                             onEntered: root.schedulePreview(model.windowHandle, runningDelegate, model.title)
                             onExited: root.closePreview()
-                            onPressed: { if (mouse.button === Qt.RightButton) { pressX = mouse.x; runningDelegate.dragged = false; return } pressX = mouse.x; runningDelegate.dragged = false }
+                            onPressed: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); pressX = mouse.x; runningDelegate.dragged = false; return } pressX = mouse.x; runningDelegate.dragged = false }
                             onPositionChanged: if (Math.abs(mouse.x - pressX) > 6) runningDelegate.dragged = true
-                            onReleased: { if (mouse.button === Qt.RightButton) { var point = runningMouse.mapToGlobal(mouse.x, mouse.y); runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && runningDelegate.dragged) { var target = Math.round((runningDelegate.x + runningDelegate.width / 2) / (runningDelegate.width + runningList.spacing)); target = Math.max(0, Math.min(runningList.count - 1, target)); runningApps.move(index, target) } }
+                            onReleased: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); var point = runningMouse.mapToGlobal(mouse.x, mouse.y); runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && runningDelegate.dragged) { var target = Math.round((runningDelegate.x + runningDelegate.width / 2) / (runningDelegate.width + runningList.spacing)); target = Math.max(0, Math.min(runningList.count - 1, target)); runningApps.move(index, target) } }
                             onClicked: { root.closePreview(); if (mouse.button === Qt.LeftButton && !runningDelegate.dragged) runningApps.activate(model.windowHandle); runningDelegate.dragged = false }
                         }
                     }
@@ -926,8 +927,9 @@ Window {
             color: "#50182747"
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, 0.12)
-            Text { anchors.left: parent.left; anchors.leftMargin: 16; anchors.top: parent.top; anchors.topMargin: 8; text: root.previewTitle; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize + 2; font.bold: true; elide: Text.ElideRight; width: parent.width - 32 }
+            Text { anchors.left: parent.left; anchors.leftMargin: 16; anchors.top: parent.top; anchors.topMargin: 8; text: root.previewTitle; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize + 2; font.bold: true; elide: Text.ElideRight; width: parent.width - 64 }
             MouseArea { anchors.fill: parent; hoverEnabled: true; onEntered: previewCloseTimer.stop(); onExited: root.closePreview(); onClicked: { previewController.hide(); previewWindow.hide(); runningApps.activate(root.previewHandle) } }
+            Rectangle { id: previewCloseButton; width: 24; height: 24; anchors.right: parent.right; anchors.top: parent.top; anchors.rightMargin: 8; anchors.topMargin: 6; radius: 12; color: previewCloseMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.2) : Qt.rgba(1, 1, 1, 0.1); z: 2; Text { anchors.centerIn: parent; text: "×"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 18; font.bold: true } MouseArea { id: previewCloseMouse; anchors.fill: parent; hoverEnabled: true; onClicked: { var handle = root.previewHandle; root.dismissPreview(); runningApps.close(handle) } } }
         }
     }
 }
