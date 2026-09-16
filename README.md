@@ -15,7 +15,7 @@ The primary target is taskbar replacement, not a floating toolbar. On Windows, T
 
 ## Current state
 
-The repository currently contains a static Qt Quick host with a Windows AppBar reservation, a three-section bottom dock layout, native executable icons, and basic launchers. The Explorer taskbar remains visible while replacement behavior is validated; Tasked does not hide it yet.
+The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a three-section bottom dock layout, native executable icons, basic launchers, and initial running-window/tray enumeration. Explorer taskbar replacement is being validated in the Windows-first build.
 
 ## Build
 
@@ -28,11 +28,11 @@ Requirements:
 From the project directory:
 
 ```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3-static-msvc2022_64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-cmake --build build --parallel
+cmake -S . -B bin -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3-static-msvc2022_64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+cmake --build bin --parallel
 ```
 
-The initial executable is `build/Tasked.exe`.
+The initial executable is `bin/Tasked.exe`.
 
 ## Source status
 
