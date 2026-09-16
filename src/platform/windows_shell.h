@@ -42,6 +42,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     QPixmap icon(qulonglong key, const QSize &requestedSize) const;
     Q_INVOKABLE void activate(const QString &key, int action);
+    Q_INVOKABLE void showContextMenu(const QString &key, int x, int y);
     Q_INVOKABLE bool isOverflow(const QString &key) const;
     Q_INVOKABLE bool isSystemFlyoutItem(const QString &key) const;
     Q_INVOKABLE void setOverflow(const QString &key, bool enabled);
