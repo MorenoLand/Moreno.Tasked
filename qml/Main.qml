@@ -16,6 +16,7 @@ Window {
     property bool verticalDock: dockPosition > 1
     property bool searchEnabled: taskedSettings.searchEnabled
     property bool clockEnabled: taskedSettings.clockEnabled
+    property bool clock24Hour: taskedSettings.clock24Hour
     property bool secondsEnabled: taskedSettings.secondsEnabled
     property bool dividersEnabled: taskedSettings.dividersEnabled
     property bool taskButtonEnabled: taskedSettings.taskButtonEnabled
@@ -57,10 +58,10 @@ Window {
     property bool dividerTwoVisible: dividersEnabled && taskButtonEnabled && searchEnabled
     property int leftWidth: verticalDock ? (visibleButtonCount > 0 ? 76 : 0) : (visibleButtonCount > 0 ? buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2 : 0)
     property int leftHeight: verticalDock ? (visibleButtonCount > 0 ? Math.max(76, visibleButtonCount * 76 + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) - 1) * 8 + dockSidePadding * 2) : 0) : 76
-    property int clockWidth: clockEnabled ? Math.max(secondsEnabled ? 112 : 88, Math.round(clockSize * (secondsEnabled ? 5.2 : 3.8) + 8)) : 0
+    property int clockWidth: clockEnabled ? Math.max(clock24Hour ? (secondsEnabled ? 112 : 88) : (secondsEnabled ? 134 : 110), Math.round(clockSize * (secondsEnabled ? (clock24Hour ? 5.2 : 6.6) : (clock24Hour ? 3.8 : 5.2)) + 8)) : 0
     property int trayPixelSize: Math.max(12, Math.round(trayIconSize * trayScale))
     property int trayCellSize: trayPixelSize + 4
-    property int overflowButtonWidth: overflowTrayIcons.count > 0 || !dockLocked ? trayCellSize : 0
+    property int overflowButtonWidth: trayEnabled ? trayCellSize : 0
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * 4)
     property int trayListHeight: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * 4)
     property bool clockSectionVisible: clockEnabled && (splitMode || !trayEnabled)
@@ -72,12 +73,16 @@ Window {
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
     property int middleHeight: Math.max(320, runningList.count * 76 + 28)
     property int sectionGap: spacedMode ? 10 : 0
+    property int horizontalContentWidth: leftWidth + middleWidth + rightWidth + clockSectionWidth
+    property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? 76 : 0)
+    property int splitSpreadGap: splitMode && spacedMode ? (verticalDock ? Math.max(sectionGap, Math.floor((height - 28 - verticalContentHeight) / 3)) : Math.max(sectionGap, Math.floor((width - 28 - horizontalContentWidth) / 3))) : sectionGap
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 11 : 18
-    property int preferredDockWidth: Math.max(1080, leftWidth + middleWidth + rightWidth + clockSectionWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
-    property int preferredDockHeight: Math.max(320, leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? 76 : 0) + sectionGap * Math.max(0, verticalSectionCount - 1))
-    property string clock: Qt.formatTime(new Date(), secondsEnabled ? "HH:mm:ss" : "HH:mm")
+    property int preferredDockWidth: Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1) + (splitMode && spacedMode && !verticalDock ? 28 : 0))
+    property int preferredDockHeight: Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1) + (splitMode && spacedMode && verticalDock ? 28 : 0))
+    property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
+    property string clock: Qt.formatTime(new Date(), clockFormat)
     property string date: Qt.formatDate(new Date(), "MMM d")
     property string previewHandle: ""
     property string previewTitle: ""
@@ -94,7 +99,7 @@ Window {
     property var previewItem: null
     Timer { id: previewOpenTimer; interval: 280; onTriggered: root.openPreview() }
     Timer { id: previewCloseTimer; interval: 140; onTriggered: { previewController.hide(); previewWindow.hide() } }
-    Timer { interval: 1000; running: true; repeat: true; onTriggered: { root.clock = Qt.formatTime(new Date(), root.secondsEnabled ? "HH:mm:ss" : "HH:mm"); root.date = Qt.formatDate(new Date(), "MMM d") } }
+    Timer { interval: 1000; running: true; repeat: true; onTriggered: { root.clock = Qt.formatTime(new Date(), root.clockFormat); root.date = Qt.formatDate(new Date(), "MMM d") } }
     onPreviewsEnabledChanged: if (!previewsEnabled) root.closePreview()
     onPreferredDockWidthChanged: if (!verticalDock && width !== preferredDockWidth) width = preferredDockWidth
     onPreferredDockHeightChanged: if (verticalDock && height !== preferredDockHeight) height = preferredDockHeight
@@ -120,11 +125,13 @@ Window {
 
     Grid {
         id: dock
+        width: root.splitMode && root.spacedMode && !root.verticalDock ? root.width - 28 : implicitWidth
+        height: root.splitMode && root.spacedMode && root.verticalDock ? root.height - 28 : implicitHeight
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         columns: root.verticalDock ? 1 : 4
-        columnSpacing: root.verticalDock ? 0 : root.sectionGap
-        rowSpacing: root.verticalDock ? root.sectionGap : 0
+        columnSpacing: root.verticalDock ? 0 : root.splitSpreadGap
+        rowSpacing: root.verticalDock ? root.splitSpreadGap : 0
 
         Rectangle {
             id: leftPanel
@@ -371,10 +378,10 @@ Window {
             Grid {
                 anchors.fill: parent
                 anchors.leftMargin: root.verticalDock ? 0 : 16
-                anchors.rightMargin: root.verticalDock ? 0 : 16
+                anchors.rightMargin: root.verticalDock ? 0 : 16 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
                 anchors.topMargin: root.verticalDock ? root.dockSidePadding : 0
-                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding : 0
-                columns: root.verticalDock ? 1 : 3
+                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? 76 + 12 : 0) : 0
+                columns: root.verticalDock ? 1 : 2
                 columnSpacing: root.verticalDock ? 0 : 12
                 rowSpacing: root.verticalDock ? 12 : 0
 
@@ -414,7 +421,7 @@ Window {
 
                 Item {
                     id: trayOverflowButton
-                    visible: overflowTrayIcons.count > 0 || !root.dockLocked
+                    visible: root.trayEnabled
                     width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
                     height: visible ? root.trayCellSize : 0
                     anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
@@ -423,24 +430,28 @@ Window {
                     MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.openPanel() }
                 }
 
-                Item {
-                    visible: root.trayEnabled && !root.splitMode && root.clockEnabled
-                    height: visible ? 76 : 0
-                    width: visible ? (root.verticalDock ? 76 : root.clockWidth) : 0
-                    Column {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.leftMargin: 4
-                        anchors.rightMargin: 4
-                        height: childrenRect.height
-                        spacing: 1
-                        Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.clock; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.clockSize; font.bold: true }
-                        Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.date; color: "#BFCBEE"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
-                    }
-            MouseArea { anchors.fill: parent; z: -1; acceptedButtons: Qt.RightButton; onClicked: root.openContextMenuAt(parent, mouse.x, mouse.y) }
+            }
+            Item {
+                id: combinedClock
+                visible: root.trayEnabled && !root.splitMode && root.clockEnabled
+                width: visible ? (root.verticalDock ? 76 : root.clockWidth) : 0
+                height: visible ? 76 : 0
+                anchors.right: root.verticalDock ? undefined : parent.right
+                anchors.bottom: root.verticalDock ? parent.bottom : undefined
+                anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
+                anchors.horizontalCenter: root.verticalDock ? parent.horizontalCenter : undefined
+                Column {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 4
+                    height: childrenRect.height
+                    spacing: 1
+                    Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.clock; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.clockSize; font.bold: true }
+                    Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: root.date; color: "#BFCBEE"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                 }
-
+                MouseArea { anchors.fill: parent; z: -1; acceptedButtons: Qt.RightButton; onClicked: root.openContextMenuAt(parent, mouse.x, mouse.y) }
             }
             MouseArea { anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter; width: Math.min(parent.width, 120); height: 10; visible: !root.dockLocked; z: 10; property real lastX: 0; property real lastY: 0; onPressed: { lastX = mouse.x; lastY = mouse.y } onPositionChanged: { var dx = mouse.x - lastX; var dy = mouse.y - lastY; trayPanel.freeX += dx; trayPanel.freeY += dy; lastX = mouse.x; lastY = mouse.y; taskedSettings.setSectionOffset("tray", Math.round(trayPanel.freeX), Math.round(trayPanel.freeY)) } }
         }
@@ -658,7 +669,7 @@ Window {
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Labels"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.labelsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.labelsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: root.quickAnimationDuration } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelsEnabled(!taskedSettings.labelsEnabled) } } }
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "System tray"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.trayEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.trayEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: root.quickAnimationDuration } } } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayEnabled(!taskedSettings.trayEnabled) } } }
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Dock position"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 100; height: 28; radius: 8; color: root.accentColor; Text { anchors.centerIn: parent; text: ["Bottom", "Top", "Left", "Right"][taskedSettings.dockPosition]; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 10; font.bold: true } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setDockPosition((taskedSettings.dockPosition + 1) % 4) } } }
-                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Spaced sections"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.spacedMode ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.spacedMode ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSpacedMode(!taskedSettings.spacedMode) } } }
+                                 Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Split layout"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 100; height: 28; radius: 8; color: root.accentColor; Text { anchors.centerIn: parent; text: taskedSettings.spacedMode ? "Spread" : "Compact"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 10; font.bold: true } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSpacedMode(!taskedSettings.spacedMode) } } }
                                  Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Lock layout"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.dockLocked ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.dockLocked ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setDockLocked(!taskedSettings.dockLocked) } } }
                             }
                         }
@@ -675,8 +686,8 @@ Window {
                             Item {
                                 width: parent.width
                                 height: 38
-                                Column { anchors.left: parent.left; anchors.right: parent.right; anchors.rightMargin: 64; anchors.verticalCenter: parent.verticalCenter; spacing: 2; Text { text: "Seconds in clock"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Show HH:mm:ss instead of HH:mm."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 10 } }
-                                Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.secondsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.secondsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSecondsEnabled(!taskedSettings.secondsEnabled) } }
+                                Column { anchors.left: parent.left; anchors.right: parent.right; anchors.rightMargin: 150; anchors.verticalCenter: parent.verticalCenter; spacing: 2; Text { text: "Seconds in clock"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Show HH:mm:ss instead of HH:mm."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 10 } }
+                                Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6; Rectangle { width: 100; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: taskedSettings.clock24Hour ? "24-hour" : "12-hour"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 10; font.bold: true } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClock24Hour(!taskedSettings.clock24Hour) } } Rectangle { width: 44; height: 24; radius: 12; anchors.verticalCenter: parent.verticalCenter; color: taskedSettings.secondsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.secondsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSecondsEnabled(!taskedSettings.secondsEnabled) } } }
                             }
                             Grid { width: parent.width; columns: 2; columnSpacing: 18; rowSpacing: 8; Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Task previews"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.previewsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.previewsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setPreviewsEnabled(!taskedSettings.previewsEnabled) } } } Item { width: 238; height: 34; Text { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: "Animations"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: taskedSettings.animationsEnabled ? root.accentColor : "#182947"; Rectangle { width: 18; height: 18; y: 3; x: taskedSettings.animationsEnabled ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setAnimationsEnabled(!taskedSettings.animationsEnabled) } } } }
                             Rectangle { width: parent.width; height: 70; radius: 14; color: "#182947"; Column { anchors.fill: parent; anchors.margins: 16; spacing: 5; Text { text: "Active task click"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true } Text { text: "Clicking the foreground task minimizes it; clicking another task activates it."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; wrapMode: Text.WordWrap; width: parent.width } } }
@@ -831,7 +842,7 @@ Window {
         id: contextMenu
         visible: false
         width: 260
-        height: root.trayContextKey.length > 0 ? 396 : 356
+        height: root.trayContextKey.length > 0 ? 428 : 388
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
         transientParent: root
@@ -856,6 +867,7 @@ Window {
                 Rectangle { width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Settings"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { contextMenu.close(); root.settingsOpen = true } } }
                 Rectangle { width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Run"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { contextMenu.close(); root.showRunDialog() } } }
                 Rectangle { width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Seconds"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.secondsEnabled ? "On" : "Off"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSecondsEnabled(!taskedSettings.secondsEnabled) } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Clock format"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.clock24Hour ? "24-hour" : "12-hour"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClock24Hour(!taskedSettings.clock24Hour) } }
                 Rectangle { width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Clock"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.clockEnabled ? "Shown" : "Hidden"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockEnabled(!taskedSettings.clockEnabled) } }
                 Rectangle { width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Tray wrapping"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.trayWrapEnabled ? "On" : "Off"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayWrapEnabled(!taskedSettings.trayWrapEnabled) } }
                 Rectangle { visible: root.trayContextKey.length > 0; width: parent.width; height: 32; radius: 9; color: "#182947"; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: trayIcons.isOverflow(root.trayContextKey) ? "Show tray icon" : "Move to overflow"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { trayIcons.setOverflow(root.trayContextKey, !trayIcons.isOverflow(root.trayContextKey)); root.trayContextKey = "" } } }

@@ -11,6 +11,7 @@ class TaskedSettings final : public QObject
     Q_PROPERTY(int dockPosition READ dockPosition WRITE setDockPosition NOTIFY dockPositionChanged)
     Q_PROPERTY(bool searchEnabled READ searchEnabled WRITE setSearchEnabled NOTIFY searchEnabledChanged)
     Q_PROPERTY(bool clockEnabled READ clockEnabled WRITE setClockEnabled NOTIFY clockEnabledChanged)
+    Q_PROPERTY(bool clock24Hour READ clock24Hour WRITE setClock24Hour NOTIFY clock24HourChanged)
     Q_PROPERTY(bool secondsEnabled READ secondsEnabled WRITE setSecondsEnabled NOTIFY secondsEnabledChanged)
     Q_PROPERTY(bool dividersEnabled READ dividersEnabled WRITE setDividersEnabled NOTIFY dividersEnabledChanged)
     Q_PROPERTY(bool taskButtonEnabled READ taskButtonEnabled WRITE setTaskButtonEnabled NOTIFY taskButtonEnabledChanged)
@@ -39,6 +40,7 @@ public:
     int dockPosition() const;
     bool searchEnabled() const;
     bool clockEnabled() const;
+    bool clock24Hour() const;
     bool secondsEnabled() const;
     bool dividersEnabled() const;
     bool taskButtonEnabled() const;
@@ -65,6 +67,7 @@ public:
     Q_INVOKABLE void setDockPosition(int value);
     Q_INVOKABLE void setSearchEnabled(bool enabled);
     Q_INVOKABLE void setClockEnabled(bool enabled);
+    Q_INVOKABLE void setClock24Hour(bool enabled);
     Q_INVOKABLE void setSecondsEnabled(bool enabled);
     Q_INVOKABLE void setDividersEnabled(bool enabled);
     Q_INVOKABLE void setTaskButtonEnabled(bool enabled);
@@ -96,6 +99,7 @@ signals:
     void dockPositionChanged();
     void searchEnabledChanged();
     void clockEnabledChanged();
+    void clock24HourChanged();
     void secondsEnabledChanged();
     void dividersEnabledChanged();
     void taskButtonEnabledChanged();
@@ -124,6 +128,7 @@ private:
     int position = 0;
     bool search = false;
     bool clock = true;
+    bool clock24 = true;
     bool seconds = false;
     bool dividers = true;
     bool taskButton = true;

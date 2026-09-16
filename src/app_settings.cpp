@@ -11,6 +11,7 @@ TaskedSettings::TaskedSettings(QObject *parent) : QObject(parent)
     position = settings.value("layout/dockPosition", 0).toInt();
     search = settings.value("layout/searchEnabled", false).toBool();
     clock = settings.value("layout/clockEnabled", true).toBool();
+    clock24 = settings.value("layout/clock24Hour", true).toBool();
     seconds = settings.value("behavior/secondsEnabled", false).toBool();
     dividers = settings.value("layout/dividersEnabled", true).toBool();
     taskButton = settings.value("layout/taskButtonEnabled", true).toBool();
@@ -39,6 +40,7 @@ bool TaskedSettings::dockLocked() const { return dockLock; }
 int TaskedSettings::dockPosition() const { return position; }
 bool TaskedSettings::searchEnabled() const { return search; }
 bool TaskedSettings::clockEnabled() const { return clock; }
+bool TaskedSettings::clock24Hour() const { return clock24; }
 bool TaskedSettings::secondsEnabled() const { return seconds; }
 bool TaskedSettings::dividersEnabled() const { return dividers; }
 bool TaskedSettings::taskButtonEnabled() const { return taskButton; }
@@ -81,6 +83,7 @@ void TaskedSettings::setSearchEnabled(bool enabled)
 }
 
 void TaskedSettings::setClockEnabled(bool enabled) { if (clock == enabled) return; clock = enabled; QSettings().setValue("layout/clockEnabled", clock); emit clockEnabledChanged(); }
+void TaskedSettings::setClock24Hour(bool enabled) { if (clock24 == enabled) return; clock24 = enabled; QSettings().setValue("layout/clock24Hour", clock24); emit clock24HourChanged(); }
 void TaskedSettings::setSecondsEnabled(bool enabled) { if (seconds == enabled) return; seconds = enabled; QSettings().setValue("behavior/secondsEnabled", seconds); emit secondsEnabledChanged(); }
 void TaskedSettings::setDividersEnabled(bool enabled) { if (dividers == enabled) return; dividers = enabled; QSettings().setValue("layout/dividersEnabled", dividers); emit dividersEnabledChanged(); }
 void TaskedSettings::setTaskButtonEnabled(bool enabled) { if (taskButton == enabled) return; taskButton = enabled; QSettings().setValue("layout/taskButtonEnabled", taskButton); emit taskButtonEnabledChanged(); }
@@ -106,6 +109,6 @@ void TaskedSettings::setBackgroundOpacity(int value) { value = qBound(0, value, 
 void TaskedSettings::setCornerRadius(int value) { value = qBound(10, value, 32); if (radius == value) return; radius = value; QSettings().setValue("style/cornerRadius", radius); emit cornerRadiusChanged(); }
 void TaskedSettings::reset()
 {
-    setSplitMode(false); setSpacedMode(true); setDockLocked(true); setDockPosition(0); setSectionOffset("left", 0, 0); setSectionOffset("middle", 0, 0); setSectionOffset("tray", 0, 0); setSectionOffset("clock", 0, 0); setSearchEnabled(false); setClockEnabled(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setPreviewsEnabled(true); setAnimationsEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(16); setTrayScale(100); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
+    setSplitMode(false); setSpacedMode(true); setDockLocked(true); setDockPosition(0); setSectionOffset("left", 0, 0); setSectionOffset("middle", 0, 0); setSectionOffset("tray", 0, 0); setSectionOffset("clock", 0, 0); setSearchEnabled(false); setClockEnabled(true); setClock24Hour(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setPreviewsEnabled(true); setAnimationsEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(16); setTrayScale(100); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
     emit sectionOffsetsChanged();
 }
