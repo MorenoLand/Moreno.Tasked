@@ -168,7 +168,8 @@ Window {
                             }
                             opacity: 0.72
                         }
-                        Text { anchors.centerIn: parent; text: "T"; color: "#FFFFFF"; font.family: root.fontFamily; font.pixelSize: Math.max(18, Math.round(root.iconSize * 0.5)); font.bold: true }
+                        Image { id: taskedImage; anchors.fill: parent; anchors.margins: 5; source: "qrc:/Tasked-icon.png"; fillMode: Image.PreserveAspectFit; smooth: true }
+                        Text { anchors.centerIn: parent; text: "T"; color: "#FFFFFF"; font.family: root.fontFamily; font.pixelSize: Math.max(18, Math.round(root.iconSize * 0.5)); font.bold: true; visible: taskedImage.status !== Image.Ready }
                     }
                     Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; text: "Tasked"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                     MouseArea { id: taskMouse; anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; hoverEnabled: true; onPressed: if (mouse.button === Qt.RightButton) root.openContextMenu(); onClicked: if (mouse.button === Qt.LeftButton) root.settingsOpen = !root.settingsOpen }

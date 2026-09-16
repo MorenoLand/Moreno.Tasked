@@ -1,0 +1,4 @@
+#include <windows.h>
+#include "resource.h"
+
+IDI_TASKED_ICON ICON "Tasked.ico"

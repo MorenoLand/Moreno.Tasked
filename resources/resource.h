@@ -1,0 +1,1 @@
+#define IDI_TASKED_ICON 101

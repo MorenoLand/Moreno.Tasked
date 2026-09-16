@@ -2,7 +2,12 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QIcon>
 #include <QWindow>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include "resources/resource.h"
+#endif
 
 #include "app_launcher.h"
 #include "app_settings.h"
@@ -21,6 +26,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Tasked");
     QCoreApplication::setApplicationName("Tasked");
     QGuiApplication app(argc, argv);
+    const QIcon appIcon(QStringLiteral(":/Tasked-icon.png"));
+    app.setWindowIcon(appIcon);
     tasked::platform::prepareTaskbarSnapshot();
     QQmlApplicationEngine engine;
     AppLauncher launcher;
@@ -46,8 +53,17 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty()) return -1;
     auto *window = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
     if (!window) return -1;
+    window->setIcon(appIcon);
     window->setGeometry(tasked::platform::installDock(window, 92));
     window->show();
+#ifdef Q_OS_WIN
+    const auto nativeWindow = reinterpret_cast<HWND>(window->winId());
+    const auto module = GetModuleHandleW(nullptr);
+    const auto largeIcon = reinterpret_cast<HICON>(LoadImageW(module, MAKEINTRESOURCEW(IDI_TASKED_ICON), IMAGE_ICON, 32, 32, LR_DEFAULTSIZE));
+    const auto smallIcon = reinterpret_cast<HICON>(LoadImageW(module, MAKEINTRESOURCEW(IDI_TASKED_ICON), IMAGE_ICON, 16, 16, LR_DEFAULTSIZE));
+    if (largeIcon) SendMessageW(nativeWindow, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(largeIcon));
+    if (smallIcon) SendMessageW(nativeWindow, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(smallIcon));
+#endif
     QObject::connect(&app, &QCoreApplication::aboutToQuit, [] { tasked::platform::uninstallDock(); });
     return app.exec();
 }
