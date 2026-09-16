@@ -422,6 +422,7 @@ bool TrayModel::isSystemFlyoutItem(const QString &key) const
     const auto value = key.toULongLong(&ok);
     const auto found = std::find_if(items.cbegin(), items.cend(), [value, ok](const Item &item) { return ok && item.key == value; });
     if (found == items.cend()) return false;
+    if (found->automationId != QStringLiteral("SystemTrayIcon")) return false;
     const auto text = (found->tooltip + QLatin1Char(' ') + found->automationId).toLower();
     return text.contains(QStringLiteral("volume")) || text.contains(QStringLiteral("sound")) || text.contains(QStringLiteral("speaker")) || text.contains(QStringLiteral("audio")) || text.contains(QStringLiteral("network")) || text.contains(QStringLiteral("wi-fi")) || text.contains(QStringLiteral("wifi")) || text.contains(QStringLiteral("internet")) || text.contains(QStringLiteral("bluetooth")) || text.contains(QStringLiteral("battery"));
 }
