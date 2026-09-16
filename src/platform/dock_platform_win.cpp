@@ -35,6 +35,7 @@ bool startMenuOpen = false;
 QTimer *trayFlyoutTimer = nullptr;
 QRect trayFlyoutAnchor;
 int trayFlyoutMisses = 0;
+bool trayFlyoutFallbackSent = false;
 QTimer *fullscreenTimer = nullptr;
 bool fullscreenHidden = false;
 
@@ -42,6 +43,7 @@ HWND nativeHandle(QWindow *window) { return reinterpret_cast<HWND>(window->winId
 void positionDock();
 bool isShellExperience(HWND window);
 bool isDesktopWindow(HWND window);
+void sendQuickSettingsHotkey();
 
 void updateFullscreenVisibility()
 {
@@ -127,17 +129,19 @@ bool isShellExperience(HWND window)
     CloseHandle(process);
     const auto name = wcsrchr(path.data(), L'\\');
     const auto executable = name ? name + 1 : path.data();
-    return ok && (_wcsicmp(executable, L"ShellExperienceHost.exe") == 0 || _wcsicmp(executable, L"StartMenuExperienceHost.exe") == 0);
+    return ok && (_wcsicmp(executable, L"ShellExperienceHost.exe") == 0 || _wcsicmp(executable, L"ShellHost.exe") == 0 || _wcsicmp(executable, L"StartMenuExperienceHost.exe") == 0);
 }
 
 BOOL CALLBACK findStartPopup(HWND window, LPARAM parameter)
 {
+    if (!IsWindowVisible(window)) return TRUE;
     wchar_t className[64]{};
     wchar_t title[64]{};
     GetClassNameW(window, className, ARRAYSIZE(className));
     GetWindowTextW(window, title, ARRAYSIZE(title));
-    const auto startWindow = wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && wcscmp(title, L"Start") == 0;
-    if (startWindow || (isStartExperience(window) && (wcscmp(className, L"Xaml_WindowedPopupClass") == 0 || wcscmp(title, L"PopupHost") == 0))) {
+    const auto startExperience = isStartExperience(window);
+    const auto startWindow = startExperience && wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && wcscmp(title, L"Start") == 0;
+    if (startWindow || (startExperience && wcscmp(className, L"Xaml_WindowedPopupClass") == 0 && wcscmp(title, L"PopupHost") == 0)) {
         *reinterpret_cast<HWND *>(parameter) = window;
         return FALSE;
     }
@@ -200,7 +204,7 @@ BOOL CALLBACK findTrayFlyout(HWND window, LPARAM parameter)
     wchar_t title[128]{};
     GetClassNameW(window, className, ARRAYSIZE(className));
     GetWindowTextW(window, title, ARRAYSIZE(title));
-    const auto popup = wcscmp(className, L"Xaml_WindowedPopupClass") == 0 && (wcscmp(title, L"PopupHost") == 0 || title[0] == L'\0');
+    const auto popup = isShellExperience(window) && wcscmp(className, L"Xaml_WindowedPopupClass") == 0 && (wcscmp(title, L"PopupHost") == 0 || title[0] == L'\0');
     const auto core = isShellExperience(window) && wcscmp(className, L"Windows.UI.Core.CoreWindow") == 0 && (_wcsicmp(title, L"Quick Settings") == 0 || _wcsicmp(title, L"Network") == 0 || _wcsicmp(title, L"Volume") == 0);
     if (popup || core) {
         *reinterpret_cast<HWND *>(parameter) = window;
@@ -253,10 +257,11 @@ void trayFlyoutMonitor(const QRect &anchor)
     if (!trayFlyoutTimer) {
         trayFlyoutTimer = new QTimer(qApp);
         trayFlyoutTimer->setInterval(16);
-        QObject::connect(trayFlyoutTimer, &QTimer::timeout, [] { if (positionTrayFlyout(trayFlyoutAnchor)) trayFlyoutMisses = 0; else if (++trayFlyoutMisses > 60) trayFlyoutTimer->stop(); });
+        QObject::connect(trayFlyoutTimer, &QTimer::timeout, [] { if (positionTrayFlyout(trayFlyoutAnchor)) trayFlyoutMisses = 0; else if (++trayFlyoutMisses == 8 && !trayFlyoutFallbackSent) { sendQuickSettingsHotkey(); trayFlyoutFallbackSent = true; } else if (trayFlyoutMisses > 60) trayFlyoutTimer->stop(); });
     }
     trayFlyoutAnchor = anchor;
     trayFlyoutMisses = 0;
+    trayFlyoutFallbackSent = false;
     trayFlyoutTimer->start();
 }
 
@@ -316,6 +321,29 @@ void sendKey(WORD key)
     input[1].ki.wVk = key;
     input[1].ki.dwFlags = KEYEVENTF_KEYUP;
     SendInput(2, input, sizeof(INPUT));
+}
+
+void sendQuickSettingsHotkey()
+{
+    INPUT input[4]{};
+    input[0].type = INPUT_KEYBOARD;
+    input[0].ki.wVk = VK_LWIN;
+    input[1].type = INPUT_KEYBOARD;
+    input[1].ki.wVk = 'A';
+    input[2] = input[1];
+    input[2].ki.dwFlags = KEYEVENTF_KEYUP;
+    input[3] = input[0];
+    input[3].ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(4, input, sizeof(INPUT));
+}
+
+void openQuickSettings()
+{
+    const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", L"ms-actioncenter:controlcenter/true", nullptr, nullptr, SW_SHOWNOACTIVATE));
+    if (result <= 32) {
+        sendQuickSettingsHotkey();
+        trayFlyoutFallbackSent = true;
+    }
 }
 
 void startPositionMonitor(const QRect &anchor)
@@ -402,7 +430,7 @@ void tasked::platform::showStartMenu(const QRect &anchor)
     startPositionMonitor(anchor);
 }
 
-void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { trayFlyoutMonitor(anchor); }
+void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { openQuickSettings(); trayFlyoutMonitor(anchor); }
 
 QRect tasked::platform::installDock(QWindow *visualWindow, int height, int position)
 {
