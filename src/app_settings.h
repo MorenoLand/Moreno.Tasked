@@ -20,6 +20,7 @@ class TaskedSettings final : public QObject
     Q_PROPERTY(int labelSize READ labelSize WRITE setLabelSize NOTIFY labelSizeChanged)
     Q_PROPERTY(int clockSize READ clockSize WRITE setClockSize NOTIFY clockSizeChanged)
     Q_PROPERTY(int iconSize READ iconSize WRITE setIconSize NOTIFY iconSizeChanged)
+    Q_PROPERTY(int trayIconSize READ trayIconSize WRITE setTrayIconSize NOTIFY trayIconSizeChanged)
     Q_PROPERTY(int surfaceOpacity READ surfaceOpacity WRITE setSurfaceOpacity NOTIFY surfaceOpacityChanged)
     Q_PROPERTY(int backgroundOpacity READ backgroundOpacity WRITE setBackgroundOpacity NOTIFY backgroundOpacityChanged)
     Q_PROPERTY(int cornerRadius READ cornerRadius WRITE setCornerRadius NOTIFY cornerRadiusChanged)
@@ -40,6 +41,7 @@ public:
     int labelSize() const;
     int clockSize() const;
     int iconSize() const;
+    int trayIconSize() const;
     int surfaceOpacity() const;
     int backgroundOpacity() const;
     int cornerRadius() const;
@@ -58,6 +60,7 @@ public:
     Q_INVOKABLE void setLabelSize(int value);
     Q_INVOKABLE void setClockSize(int value);
     Q_INVOKABLE void setIconSize(int value);
+    Q_INVOKABLE void setTrayIconSize(int value);
     Q_INVOKABLE void setSurfaceOpacity(int value);
     Q_INVOKABLE void setBackgroundOpacity(int value);
     Q_INVOKABLE void setCornerRadius(int value);
@@ -78,6 +81,7 @@ signals:
     void labelSizeChanged();
     void clockSizeChanged();
     void iconSizeChanged();
+    void trayIconSizeChanged();
     void surfaceOpacityChanged();
     void backgroundOpacityChanged();
     void cornerRadiusChanged();
@@ -97,6 +101,7 @@ private:
     int label = 9;
     int clockFont = 20;
     int icon = 42;
+    int trayIcon = 16;
     int opacity = 100;
     int background = 100;
     int radius = 22;

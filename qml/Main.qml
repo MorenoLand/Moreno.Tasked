@@ -26,6 +26,7 @@ Window {
     property int labelSize: taskedSettings.labelSize
     property int clockSize: taskedSettings.clockSize
     property int iconSize: taskedSettings.iconSize
+    property int trayIconSize: taskedSettings.trayIconSize
     property real dockOpacity: taskedSettings.surfaceOpacity / 100
     property real backgroundOpacity: taskedSettings.backgroundOpacity / 100
     property int cornerRadius: taskedSettings.cornerRadius
@@ -42,9 +43,9 @@ Window {
     property bool dividerTwoVisible: dividersEnabled && taskButtonEnabled && searchEnabled
     property int leftWidth: buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2
     property int clockWidth: clockEnabled ? (secondsEnabled ? 98 : 78) : 0
-    property int overflowButtonWidth: overflowTrayIcons.count > 0 ? 26 : 0
+    property int overflowButtonWidth: overflowTrayIcons.count > 0 ? trayIconSize + 4 : 0
     property int trayControlGaps: (clockEnabled ? 1 : 0) + (overflowButtonWidth > 0 ? 1 : 0)
-    property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * 30 - 4)
+    property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * (trayIconSize + 4) - 4)
     property int rightWidth: trayWrapEnabled || trayScrollEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + clockWidth + trayControlGaps * 12)
     property int trayListWidth: trayWrapEnabled || trayScrollEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - clockWidth - trayControlGaps * 12) : unwrappedTrayWidth
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
@@ -283,15 +284,15 @@ Window {
                 id: trayDelegate
                 Item {
                     id: trayItem
-                    width: root.trayWrapEnabled ? 22 : 26
-                    height: root.trayWrapEnabled ? 22 : 30
+                    width: root.trayIconSize + 4
+                    height: root.trayIconSize + 4
                     property bool dragged: false
                     property real pressX: 0
                     property real pressY: 0
                     scale: trayMouse.containsMouse ? 1.12 : 1
                     Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
-                    Rectangle { anchors.centerIn: parent; width: root.trayWrapEnabled ? 22 : 26; height: root.trayWrapEnabled ? 22 : 26; radius: 7; color: root.iconSurfaceColor }
-                    Image { id: trayImage; anchors.centerIn: parent; width: root.trayWrapEnabled ? 18 : 22; height: root.trayWrapEnabled ? 18 : 22; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 1 }
+                    Rectangle { anchors.centerIn: parent; width: root.trayIconSize + 4; height: root.trayIconSize + 4; radius: 7; color: root.iconSurfaceColor }
+                    Image { id: trayImage; anchors.centerIn: parent; width: root.trayIconSize; height: root.trayIconSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 1 }
                     Text { anchors.centerIn: parent; text: model.tooltip.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize + 2; font.bold: true; visible: trayImage.status !== Image.Ready }
                     MouseArea {
                         id: trayMouse
@@ -344,7 +345,7 @@ Window {
                 Item {
                     id: trayOverflowButton
                     width: root.overflowButtonWidth
-                    height: 30
+                    height: root.trayIconSize + 4
                     visible: overflowTrayIcons.count > 0
                     Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                     Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
@@ -440,7 +441,7 @@ Window {
                     width: parent.width
                     height: 32
                     Text { text: "Settings"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 22; font.bold: true }
-                    Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: ["Styling", "Layout", "Behavior", "Typography"][root.settingsTab]; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true }
+                    Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: ["Styling", "Layout", "Behavior", "Typography", "Extensions"][root.settingsTab]; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true }
                 }
 
                 Row {
@@ -448,9 +449,9 @@ Window {
                     height: 32
                     spacing: 6
                     Repeater {
-                        model: ["Styling", "Layout", "Behavior", "Typography"]
+                        model: ["Styling", "Layout", "Behavior", "Typography", "Extensions"]
                         delegate: Rectangle {
-                            width: 119
+                            width: (parent.width - 24) / 5
                             height: 32
                             radius: 10
                             color: root.settingsTab === index ? root.accentColor : "#182947"
@@ -487,9 +488,11 @@ Window {
                                         height: 78
                                         radius: 16
                                         color: root.theme === index ? root.accentColor : "#182947"
+                                        border.width: root.theme === index ? 2 : 0
+                                        border.color: "#F3F6FF"
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                         Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.topMargin: 14; text: modelData; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; font.bold: true }
-                                        Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 15; width: 96; height: 9; radius: 5; color: index === 0 ? "#6D8DF4" : index === 1 ? "#58D3E8" : "#C28CFF" }
+                                        Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 15; width: 96; height: 9; radius: 5; color: root.theme === index ? "#F3F6FF" : index === 0 ? "#6D8DF4" : index === 1 ? "#58D3E8" : "#C28CFF" }
                                         MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTheme(index) }
                                     }
                                 }
@@ -587,6 +590,77 @@ Window {
                             Row { width: parent.width; height: 30; Text { width: 110; text: "Label size"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.labelSize + " px"; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "−"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelSize(taskedSettings.labelSize - 1) } } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "+"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelSize(taskedSettings.labelSize + 1) } } }
                             Row { width: parent.width; height: 30; Text { width: 110; text: "Clock size"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.clockSize + " px"; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "−"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockSize(taskedSettings.clockSize - 1) } } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "+"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockSize(taskedSettings.clockSize + 1) } } }
                             Row { width: parent.width; height: 30; Text { width: 110; text: "Icon size"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.iconSize + " px"; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "−"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setIconSize(taskedSettings.iconSize - 2) } } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "+"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setIconSize(taskedSettings.iconSize + 2) } } }
+                            Row { width: parent.width; height: 30; Text { width: 110; text: "Tray icon size"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.trayIconSize + " px"; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "−"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayIconSize(taskedSettings.trayIconSize - 1) } } Rectangle { width: 28; height: 28; radius: 8; color: "#182947"; Text { anchors.centerIn: parent; text: "+"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayIconSize(taskedSettings.trayIconSize + 1) } } }
+                        }
+                    }
+
+                    Item {
+                        anchors.fill: parent
+                        visible: root.settingsTab === 4
+                        Column {
+                            anchors.fill: parent
+                            spacing: 8
+                            Text { text: "Extensions"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
+                            Text { text: "Manage optional extensions discovered beside the executable."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11 }
+                            Row { width: parent.width; height: 30; Text { width: parent.width - 92; text: "bin/extensions"; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 10; elide: Text.ElideMiddle; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 80; height: 28; radius: 9; color: root.accentColor; Text { anchors.centerIn: parent; text: "Rescan"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 10; font.bold: true } MouseArea { anchors.fill: parent; onClicked: extensions.refresh() } } }
+                            ListView {
+                                id: extensionList
+                                width: parent.width
+                                height: 195
+                                clip: true
+                                spacing: 8
+                                model: extensions
+                                delegate: Rectangle {
+                                    id: extensionCard
+                                    width: extensionList.width
+                                    height: 76 + (expanded && extensionSettings.length > 0 ? extensionSettings.length * 36 + 8 : 0)
+                                    radius: 14
+                                    color: "#182947"
+                                    property bool expanded: false
+                                    property string extensionId: model.id
+                                    property string extensionName: model.name
+                                    property string extensionVersion: model.version
+                                    property bool extensionEnabled: model.enabled
+                                    property string extensionDescription: model.description
+                                    property var extensionSettings: model.settings || []
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 12
+                                        spacing: 6
+                                        Row {
+                                            width: parent.width
+                                            height: 28
+                                            Column {
+                                                width: parent.width - 92
+                                                Text { width: parent.width; text: extensionCard.extensionName + (extensionCard.extensionVersion.length > 0 ? "  ·  v" + extensionCard.extensionVersion : ""); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
+                                                Text { width: parent.width; text: extensionCard.extensionEnabled ? "Enabled" : "Disabled"; color: extensionCard.extensionEnabled ? root.accentColor : "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 9 }
+                                            }
+                                            Rectangle { width: 44; height: 24; radius: 12; anchors.verticalCenter: parent.verticalCenter; color: extensionCard.extensionEnabled ? root.accentColor : "#0F1B33"; Rectangle { width: 18; height: 18; y: 3; x: extensionCard.extensionEnabled ? 23 : 3; radius: 9; color: "#F3F6FF"; Behavior on x { NumberAnimation { duration: 140 } } } MouseArea { anchors.fill: parent; onClicked: extensions.setEnabled(extensionCard.extensionId, !extensionCard.extensionEnabled) } }
+                                            Rectangle { width: 28; height: 28; radius: 8; color: "#243A60"; Text { anchors.centerIn: parent; text: extensionCard.expanded ? "−" : "+"; color: "#F3F6FF"; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: extensionCard.expanded = !extensionCard.expanded } }
+                                        }
+                                        Text { visible: extensionCard.extensionDescription.length > 0; width: parent.width; text: extensionCard.extensionDescription; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 9; elide: Text.ElideRight }
+                                        Column {
+                                            visible: extensionCard.expanded
+                                            width: parent.width
+                                            spacing: 6
+                                            Repeater {
+                                                model: extensionCard.extensionSettings
+                                                delegate: Item {
+                                                    width: parent.width
+                                                    height: 30
+                                                    property var setting: modelData
+                                                    Text { width: parent.width - 120; text: setting.label; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 10; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight }
+                                                    Rectangle { visible: setting.type === "bool"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 44; height: 24; radius: 12; color: setting.value ? root.accentColor : "#0F1B33"; Rectangle { width: 18; height: 18; y: 3; x: setting.value ? 23 : 3; radius: 9; color: "#F3F6FF" } MouseArea { anchors.fill: parent; onClicked: extensions.setSetting(extensionCard.extensionId, setting.key, !setting.value) } } 
+                                                    Row { visible: setting.type === "number"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 4; Text { width: 38; text: Number(setting.value).toFixed(1); color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 10; horizontalAlignment: Text.AlignRight } Rectangle { width: 25; height: 25; radius: 7; color: "#243A60"; Text { anchors.centerIn: parent; text: "−"; color: "#F3F6FF"; font.pixelSize: 14 } MouseArea { anchors.fill: parent; onClicked: extensions.setSetting(extensionCard.extensionId, setting.key, Number(setting.value) - Number(setting.step || 1)) } } Rectangle { width: 25; height: 25; radius: 7; color: "#243A60"; Text { anchors.centerIn: parent; text: "+"; color: "#F3F6FF"; font.pixelSize: 14 } MouseArea { anchors.fill: parent; onClicked: extensions.setSetting(extensionCard.extensionId, setting.key, Number(setting.value) + Number(setting.step || 1)) } } }
+                                                    Rectangle { visible: setting.type === "enum"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 110; height: 27; radius: 8; color: "#243A60"; Text { anchors.centerIn: parent; width: parent.width - 12; text: setting.value; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 9; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight } MouseArea { anchors.fill: parent; onClicked: { var options = setting.options; var current = options.indexOf(setting.value); extensions.setSetting(extensionCard.extensionId, setting.key, options[(current + 1) % options.length]) } } }
+                                                    Rectangle { visible: setting.type === "string"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 110; height: 27; radius: 8; color: "#243A60"; TextInput { anchors.fill: parent; anchors.margins: 7; text: setting.value; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 9; selectByMouse: true; onEditingFinished: extensions.setSetting(extensionCard.extensionId, setting.key, text) } }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Text { visible: extensionList.count === 0; text: "No extensions found in bin/extensions."; color: "#AAB8D8"; font.family: root.fontFamily; font.pixelSize: 11 }
                         }
                     }
                 }
@@ -606,8 +680,8 @@ Window {
     Window {
         id: trayOverflowWindow
         visible: false
-        width: Math.min(340, Math.max(136, Math.min(8, overflowTrayIcons.count) * 34 + 24))
-        height: Math.max(82, Math.ceil(overflowTrayIcons.count / 8) * 34 + 54)
+        width: Math.min(320, Math.max(126, Math.min(8, overflowTrayIcons.count) * (root.trayIconSize + 8) + 24))
+        height: Math.max(82, Math.ceil(overflowTrayIcons.count / 8) * (root.trayIconSize + 8) + 54)
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
         transientParent: root
@@ -635,10 +709,10 @@ Window {
                 Repeater {
                     model: overflowTrayIcons
                     delegate: Item {
-                        width: 26
-                        height: 26
+                        width: root.trayIconSize + 4
+                        height: root.trayIconSize + 4
                         Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
-                        Image { anchors.centerIn: parent; width: 18; height: 18; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
+                        Image { anchors.centerIn: parent; width: root.trayIconSize; height: root.trayIconSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
                         MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: if (mouse.button === Qt.RightButton) root.openTrayContextMenu(model.key); onClicked: if (mouse.button === Qt.LeftButton) trayIcons.activate(model.key, 0) }
                     }
                 }

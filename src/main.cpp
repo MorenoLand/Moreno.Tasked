@@ -6,6 +6,7 @@
 
 #include "app_launcher.h"
 #include "app_settings.h"
+#include "extensions_model.h"
 #include "preview_controller.h"
 #include "platform/dock_platform.h"
 #include "platform/tray_icon_provider.h"
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     AppLauncher launcher;
     TaskedSettings taskedSettings;
+    ExtensionModel extensions;
     PreviewController previewController;
     RunningAppsModel runningApps;
     TrayModel trayIcons;
@@ -33,6 +35,7 @@ int main(int argc, char *argv[])
     engine.addImageProvider("tray", new TrayIconProvider(&trayIcons));
     engine.rootContext()->setContextProperty("launcher", &launcher);
     engine.rootContext()->setContextProperty("taskedSettings", &taskedSettings);
+    engine.rootContext()->setContextProperty("extensions", &extensions);
     engine.rootContext()->setContextProperty("previewController", &previewController);
     engine.rootContext()->setContextProperty("runningApps", &runningApps);
     engine.rootContext()->setContextProperty("trayIcons", &trayIcons);

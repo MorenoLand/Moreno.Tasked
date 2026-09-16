@@ -15,7 +15,11 @@ The primary target is taskbar replacement, not a floating toolbar. On Windows, T
 
 ## Current state
 
-The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a configurable Combined/Split bottom dock, native executable icons, running-window/tray enumeration, Start-menu access, adaptive tray sizing with persistent ordering, overflow and optional scrolling, independent background opacity, and tabbed Layout, Behavior, Theme, and Typography settings. Explorer taskbar replacement is being validated in the Windows-first build.
+The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a configurable Combined/Split bottom dock, native executable icons, running-window/tray enumeration, Start-menu access, adaptive tray sizing with persistent ordering, overflow and optional scrolling, independent background opacity, and tabbed Layout, Behavior, Theme, Typography, and Extensions settings. Explorer taskbar replacement is being validated in the Windows-first build.
+
+## Extensions
+
+Tasked discovers extension directories beside the executable at `bin/extensions/<id>/`. An extension can expose a `manifest.json` with `name`, `version`, `description`, and a `settings` array or object. Supported setting types are `bool`, `number`, `string`, and `enum`; enabled state and values are persisted per extension. The Extensions tab can rescan, enable or disable extensions, and edit their declared settings.
 
 ## Build
 
