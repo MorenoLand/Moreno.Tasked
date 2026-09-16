@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+void tasked::platform::prepareTaskbarSnapshot() {}
+
 QRect tasked::platform::installDock(QWindow *, int height)
 {
     const auto area = QGuiApplication::primaryScreen()->availableGeometry();

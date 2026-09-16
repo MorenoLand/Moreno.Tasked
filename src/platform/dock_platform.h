@@ -5,6 +5,7 @@
 class QWindow;
 
 namespace tasked::platform {
+void prepareTaskbarSnapshot();
 QRect installDock(QWindow *visualWindow, int height);
 void uninstallDock();
 int runTaskbarGuard(quint32 parentPid);

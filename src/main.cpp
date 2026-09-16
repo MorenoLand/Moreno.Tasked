@@ -5,6 +5,7 @@
 #include <QWindow>
 
 #include "app_launcher.h"
+#include "app_settings.h"
 #include "platform/dock_platform.h"
 #include "platform/tray_icon_provider.h"
 #include "platform/windows_shell.h"
@@ -15,14 +16,19 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_WIN
     if (argc >= 3 && QString::fromLocal8Bit(argv[1]) == "--tasked-taskbar-guard") return tasked::platform::runTaskbarGuard(QString::fromLocal8Bit(argv[2]).toUInt());
 #endif
+    QCoreApplication::setOrganizationName("Tasked");
+    QCoreApplication::setApplicationName("Tasked");
     QGuiApplication app(argc, argv);
+    tasked::platform::prepareTaskbarSnapshot();
     QQmlApplicationEngine engine;
     AppLauncher launcher;
+    TaskedSettings taskedSettings;
     RunningAppsModel runningApps;
     TrayModel trayIcons;
     engine.addImageProvider("shell", new ShellIconProvider);
     engine.addImageProvider("tray", new TrayIconProvider(&trayIcons));
     engine.rootContext()->setContextProperty("launcher", &launcher);
+    engine.rootContext()->setContextProperty("taskedSettings", &taskedSettings);
     engine.rootContext()->setContextProperty("runningApps", &runningApps);
     engine.rootContext()->setContextProperty("trayIcons", &trayIcons);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

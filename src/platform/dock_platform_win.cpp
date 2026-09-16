@@ -103,6 +103,8 @@ void positionDock()
 }
 }
 
+void tasked::platform::prepareTaskbarSnapshot() { restoreAllTaskbars(); }
+
 QRect tasked::platform::installDock(QWindow *visualWindow, int height)
 {
     visual = visualWindow;

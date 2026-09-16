@@ -2,7 +2,7 @@
 
 Tasked is a C++ and Qt Quick desktop shell intended to replace the operating system taskbar with an elegant, extensible bar for Windows, macOS, and Linux.
 
-The primary target is taskbar replacement, not a floating toolbar. On Windows, Tasked will eventually manage the Explorer taskbar lifecycle and remain responsible for the desktop taskbar experience. The native taskbar is not hidden by the current scaffold.
+The primary target is taskbar replacement, not a floating toolbar. On Windows, Tasked currently hides and reserves the Explorer taskbar while the dock is running, then restores it when Tasked exits.
 
 ## Project direction
 
@@ -15,7 +15,7 @@ The primary target is taskbar replacement, not a floating toolbar. On Windows, T
 
 ## Current state
 
-The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a three-section bottom dock layout, native executable icons, basic launchers, and initial running-window/tray enumeration. Explorer taskbar replacement is being validated in the Windows-first build.
+The repository currently contains a static Qt Quick host with a Windows AppBar reservation, taskbar takeover/restore guard, a configurable Combined/Split bottom dock, native executable icons, running-window/tray enumeration, and the first Styling settings surface. Explorer taskbar replacement is being validated in the Windows-first build.
 
 ## Build
 

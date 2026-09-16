@@ -2,6 +2,8 @@
 
 #include <QFileInfo>
 #include <QImage>
+#include <QRect>
+#include <QSet>
 #include <QUrl>
 
 #ifdef Q_OS_WIN
@@ -82,13 +84,15 @@ QImage captureTrayIcon(const RECT &bounds)
     DeleteDC(memory);
     ReleaseDC(nullptr, screen);
     if (image.isNull()) return {};
-    const auto background = image.pixel(0, 0);
+    const std::array<QRgb, 4> backgrounds{ image.pixel(0, 0), image.pixel(size - 1, 0), image.pixel(0, size - 1), image.pixel(size - 1, size - 1) };
     for (int yPixel = 0; yPixel < image.height(); ++yPixel) for (int xPixel = 0; xPixel < image.width(); ++xPixel) {
         const auto pixel = image.pixel(xPixel, yPixel);
-        const auto distance = qAbs(qRed(pixel) - qRed(background)) + qAbs(qGreen(pixel) - qGreen(background)) + qAbs(qBlue(pixel) - qBlue(background));
-        if (distance < 28) image.setPixel(xPixel, yPixel, pixel & 0x00FFFFFF);
+        const auto background = std::any_of(backgrounds.cbegin(), backgrounds.cend(), [pixel](QRgb corner) { return qAbs(qRed(pixel) - qRed(corner)) + qAbs(qGreen(pixel) - qGreen(corner)) + qAbs(qBlue(pixel) - qBlue(corner)) < 72; });
+        if (background) image.setPixel(xPixel, yPixel, pixel & 0x00FFFFFF);
     }
-    return image;
+    QRect content;
+    for (int yPixel = 0; yPixel < image.height(); ++yPixel) for (int xPixel = 0; xPixel < image.width(); ++xPixel) if (qAlpha(image.pixel(xPixel, yPixel)) > 40) content |= QRect(xPixel, yPixel, 1, 1);
+    return content.isValid() ? image.copy(content.adjusted(-2, -2, 2, 2).intersected(image.rect())) : QImage();
 }
 
 IUIAutomation *automation()
@@ -194,7 +198,7 @@ BOOL CALLBACK enumerateWindows(HWND window, LPARAM parameter)
     const auto length = GetWindowTextW(window, title.data(), static_cast<int>(title.size()));
     if (length <= 0) return TRUE;
     const auto path = processPath(window);
-    context.items.append({ static_cast<qulonglong>(reinterpret_cast<quintptr>(window)), QString::fromWCharArray(title.data(), length), path.isEmpty() ? QString() : QStringLiteral("image://shell/") + QString::fromLatin1(QUrl::toPercentEncoding(path)), window == context.foreground });
+    context.items.append({ static_cast<qulonglong>(reinterpret_cast<quintptr>(window)), QString::fromWCharArray(title.data(), length), QStringLiteral("image://shell/window/") + QString::number(static_cast<qulonglong>(reinterpret_cast<quintptr>(window))), window == context.foreground });
     return TRUE;
 }
 
@@ -358,6 +362,19 @@ void TrayModel::refresh()
     QVector<Item> next = automationTrayItems(visible);
     if (next.isEmpty() && !visible) return;
     if (next.isEmpty()) for (const auto toolbar : trayToolbars()) enumerateToolbar(toolbar, next);
+    if (!items.isEmpty() && !next.isEmpty()) {
+        QVector<Item> ordered;
+        QSet<qulonglong> placed;
+        for (const auto &old : items) {
+            const auto found = std::find_if(next.begin(), next.end(), [&old](const Item &item) { return item.key == old.key; });
+            if (found != next.end()) {
+                placed.insert(found->key);
+                ordered.append(std::move(*found));
+            }
+        }
+        for (auto &item : next) if (!placed.contains(item.key)) ordered.append(std::move(item));
+        next = std::move(ordered);
+    }
     for (auto &item : next) {
         const auto old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.key == item.key; });
         if (old != items.cend() && item.image.isNull()) item.image = old->image;
