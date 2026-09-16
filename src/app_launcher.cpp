@@ -16,4 +16,5 @@ bool AppLauncher::launch(const QString &target)
 }
 
 void AppLauncher::showStartMenu(int x, int y, int width, int height) { tasked::platform::showStartMenu({ x, y, width, height }); }
+void AppLauncher::showRunDialog(int x, int y, int width, int height) { tasked::platform::showRunDialog({ x, y, width, height }); }
 void AppLauncher::showSystemTrayFlyout(int x, int y, int width, int height) { tasked::platform::showSystemTrayFlyout({ x, y, width, height }); }

@@ -32,6 +32,10 @@ QTimer *startPositionTimer = nullptr;
 QRect startAnchor;
 int startPositionMisses = 0;
 bool startMenuOpen = false;
+QTimer *runPositionTimer = nullptr;
+QRect runAnchor;
+int runPositionMisses = 0;
+int runPositionFrames = 0;
 QTimer *trayFlyoutTimer = nullptr;
 QRect trayFlyoutAnchor;
 int trayFlyoutMisses = 0;
@@ -43,6 +47,7 @@ HWND nativeHandle(QWindow *window) { return reinterpret_cast<HWND>(window->winId
 void positionDock();
 bool isShellExperience(HWND window);
 bool isDesktopWindow(HWND window);
+void sendShortcut(WORD modifier, WORD key);
 void sendQuickSettingsHotkey();
 
 void updateFullscreenVisibility()
@@ -189,8 +194,8 @@ BOOL CALLBACK findStartPopupChildren(HWND window, LPARAM parameter)
 
 HWND startPopup()
 {
-    if (const auto result = FindWindowW(L"Windows.UI.Core.CoreWindow", L"Start")) return result;
-    if (const auto result = FindWindowW(L"Xaml_WindowedPopupClass", L"PopupHost")) return result;
+    if (const auto result = FindWindowW(L"Windows.UI.Core.CoreWindow", L"Start"); result && IsWindowVisible(result) && isStartExperience(result)) return result;
+    if (const auto result = FindWindowW(L"Xaml_WindowedPopupClass", L"PopupHost"); result && IsWindowVisible(result) && isStartExperience(result)) return result;
     HWND result = nullptr;
     EnumWindows(findStartPopup, reinterpret_cast<LPARAM>(&result));
     if (!result) EnumWindows(findStartPopupChildren, reinterpret_cast<LPARAM>(&result));
@@ -311,6 +316,60 @@ bool positionStartPopup(const QRect &anchor)
     return SetWindowPos(popup, HWND_TOP, position.x, position.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 }
 
+bool isRunDialog(HWND window)
+{
+    if (!window || !IsWindowVisible(window)) return false;
+    wchar_t className[64]{};
+    wchar_t title[64]{};
+    GetClassNameW(window, className, ARRAYSIZE(className));
+    GetWindowTextW(window, title, ARRAYSIZE(title));
+    return wcscmp(className, L"#32770") == 0 && _wcsicmp(title, L"Run") == 0;
+}
+
+BOOL CALLBACK findRunDialog(HWND window, LPARAM parameter)
+{
+    if (isRunDialog(window)) {
+        *reinterpret_cast<HWND *>(parameter) = window;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+HWND runDialog()
+{
+    if (const auto result = FindWindowW(L"#32770", L"Run"); isRunDialog(result)) return result;
+    HWND result = nullptr;
+    EnumWindows(findRunDialog, reinterpret_cast<LPARAM>(&result));
+    return result;
+}
+
+bool positionRunDialog(const QRect &anchor)
+{
+    const auto dialog = runDialog();
+    if (!dialog) return false;
+    RECT current{};
+    if (!GetWindowRect(dialog, &current)) return false;
+    const auto width = current.right - current.left;
+    const auto height = current.bottom - current.top;
+    if (width <= 0 || height <= 0) return false;
+    const auto monitor = MonitorFromPoint({ anchor.center().x(), anchor.center().y() }, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{ sizeof(info) };
+    GetMonitorInfoW(monitor, &info);
+    auto x = anchor.center().x() - width / 2;
+    auto y = anchor.top() - height - 12;
+    if (dockPosition == 1) y = anchor.bottom() + 12;
+    else if (dockPosition == 2) {
+        x = anchor.right() + 12;
+        y = anchor.center().y() - height / 2;
+    } else if (dockPosition == 3) {
+        x = anchor.left() - width - 12;
+        y = anchor.center().y() - height / 2;
+    }
+    x = (std::max)(info.rcWork.left + 8, (std::min)(x, info.rcWork.right - width - 8));
+    y = (std::max)(info.rcWork.top + 8, (std::min)(y, info.rcWork.bottom - height - 8));
+    return SetWindowPos(dialog, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
 bool startMenuIsOpen() { const auto popup = startPopup(); return popup && IsWindowVisible(popup) && startPanelBounds(popup).isValid(); }
 void sendKey(WORD key)
 {
@@ -323,19 +382,21 @@ void sendKey(WORD key)
     SendInput(2, input, sizeof(INPUT));
 }
 
-void sendQuickSettingsHotkey()
+void sendShortcut(WORD modifier, WORD key)
 {
     INPUT input[4]{};
     input[0].type = INPUT_KEYBOARD;
-    input[0].ki.wVk = VK_LWIN;
+    input[0].ki.wVk = modifier;
     input[1].type = INPUT_KEYBOARD;
-    input[1].ki.wVk = 'A';
+    input[1].ki.wVk = key;
     input[2] = input[1];
     input[2].ki.dwFlags = KEYEVENTF_KEYUP;
     input[3] = input[0];
     input[3].ki.dwFlags = KEYEVENTF_KEYUP;
     SendInput(4, input, sizeof(INPUT));
 }
+
+void sendQuickSettingsHotkey() { sendShortcut(VK_LWIN, 'A'); }
 
 void openQuickSettings()
 {
@@ -356,6 +417,19 @@ void startPositionMonitor(const QRect &anchor)
     startAnchor = anchor;
     startPositionMisses = 0;
     startPositionTimer->start();
+}
+
+void runPositionMonitor(const QRect &anchor)
+{
+    if (!runPositionTimer) {
+        runPositionTimer = new QTimer(qApp);
+        runPositionTimer->setInterval(16);
+        QObject::connect(runPositionTimer, &QTimer::timeout, [] { if (positionRunDialog(runAnchor)) { runPositionMisses = 0; if (++runPositionFrames > 45) runPositionTimer->stop(); } else if (++runPositionMisses > 60) runPositionTimer->stop(); });
+    }
+    runAnchor = anchor;
+    runPositionMisses = 0;
+    runPositionFrames = 0;
+    runPositionTimer->start();
 }
 
 bool startTaskbarGuard()
@@ -428,6 +502,12 @@ void tasked::platform::showStartMenu(const QRect &anchor)
     sendKey(VK_LWIN);
     startMenuOpen = true;
     startPositionMonitor(anchor);
+}
+
+void tasked::platform::showRunDialog(const QRect &anchor)
+{
+    sendShortcut(VK_LWIN, 'R');
+    runPositionMonitor(anchor);
 }
 
 void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { openQuickSettings(); trayFlyoutMonitor(anchor); }

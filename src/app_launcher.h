@@ -9,5 +9,6 @@ public:
     using QObject::QObject;
     Q_INVOKABLE bool launch(const QString &target);
     Q_INVOKABLE void showStartMenu(int x, int y, int width, int height);
+    Q_INVOKABLE void showRunDialog(int x, int y, int width, int height);
     Q_INVOKABLE void showSystemTrayFlyout(int x, int y, int width, int height);
 };
