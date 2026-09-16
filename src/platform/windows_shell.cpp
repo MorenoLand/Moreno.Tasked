@@ -572,13 +572,13 @@ QPixmap TrayModel::icon(qulonglong key, const QSize &requestedSize) const
     const auto requested = requestedSize.isValid() ? requestedSize : QSize(32, 32);
     const auto found = std::find_if(items.cbegin(), items.cend(), [key](const Item &item) { return item.key == key; });
     if (found == items.cend()) return {};
-    if (!found->image.isNull()) return QPixmap::fromImage(found->image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     const auto copy = CopyIcon(reinterpret_cast<HICON>(found->icon));
     if (copy) {
         const auto image = QImage::fromHICON(copy);
         DestroyIcon(copy);
-        return QPixmap::fromImage(image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        if (!image.isNull()) return QPixmap::fromImage(image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
+    if (!found->image.isNull()) return QPixmap::fromImage(found->image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     return iconFromPath(processPath(reinterpret_cast<HWND>(static_cast<quintptr>(found->owner))), requested);
 #else
     Q_UNUSED(key);
