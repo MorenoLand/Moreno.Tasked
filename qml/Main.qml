@@ -101,6 +101,7 @@ Window {
     Timer { id: previewCloseTimer; interval: 140; onTriggered: { previewController.hide(); previewWindow.hide() } }
     Timer { interval: 1000; running: true; repeat: true; onTriggered: { root.clock = Qt.formatTime(new Date(), root.clockFormat); root.date = Qt.formatDate(new Date(), "MMM d") } }
     onPreviewsEnabledChanged: if (!previewsEnabled) root.closePreview()
+    onClockFormatChanged: root.clock = Qt.formatTime(new Date(), root.clockFormat)
     onPreferredDockWidthChanged: if (!verticalDock && width !== preferredDockWidth) width = preferredDockWidth
     onPreferredDockHeightChanged: if (verticalDock && height !== preferredDockHeight) height = preferredDockHeight
 
