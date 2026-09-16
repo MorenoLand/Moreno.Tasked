@@ -32,7 +32,7 @@ void PreviewController::show(const QString &windowHandle, QObject *destination, 
     const auto scale = destinationWindow->devicePixelRatio();
     DWM_THUMBNAIL_PROPERTIES properties{};
     properties.dwFlags = DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY;
-    properties.rcDestination = { static_cast<LONG>(8 * scale), static_cast<LONG>(30 * scale), static_cast<LONG>((width - 8) * scale), static_cast<LONG>((height - 8) * scale) };
+    properties.rcDestination = { static_cast<LONG>(14 * scale), static_cast<LONG>(30 * scale), static_cast<LONG>((width - 14) * scale), static_cast<LONG>((height - 14) * scale) };
     properties.fVisible = TRUE;
     properties.opacity = 255;
     if (FAILED(DwmUpdateThumbnailProperties(thumb, &properties))) {

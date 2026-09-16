@@ -697,6 +697,7 @@ Window {
             anchors.fill: parent
             anchors.margins: 4
             radius: 20
+            clip: true
             color: "#50182747"
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, 0.12)
