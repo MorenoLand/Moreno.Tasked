@@ -47,8 +47,8 @@ Window {
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * 30 - 4)
     property int rightWidth: trayWrapEnabled || trayScrollEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + clockWidth + trayControlGaps * 12)
     property int trayListWidth: trayWrapEnabled || trayScrollEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - clockWidth - trayControlGaps * 12) : unwrappedTrayWidth
-    property int middleWidth: Math.max(320, root.width - leftWidth - rightWidth - (splitMode ? 20 : 0))
-    property int preferredDockWidth: Math.max(1080, leftWidth + 320 + rightWidth + (splitMode ? 20 : 0))
+    property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
+    property int preferredDockWidth: Math.max(1080, leftWidth + middleWidth + rightWidth + (splitMode ? 20 : 0))
     property string clock: Qt.formatTime(new Date(), secondsEnabled ? "HH:mm:ss" : "HH:mm")
     property string date: Qt.formatDate(new Date(), "MMM d")
     property string previewHandle: ""
@@ -116,7 +116,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: 10
+                        anchors.topMargin: 11
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: startMouse.containsMouse ? 1.1 : 1
@@ -153,7 +153,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: 10
+                        anchors.topMargin: 11
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: taskMouse.containsMouse ? 1.1 : 1
@@ -185,7 +185,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: 10
+                        anchors.topMargin: 11
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.iconSurfaceColor
                         scale: searchMouse.containsMouse ? 1.1 : 1
@@ -236,7 +236,7 @@ Window {
                             height: root.iconSize
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.top: parent.top
-                            anchors.topMargin: 10
+                            anchors.topMargin: 11
                             radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                             color: root.iconSurfaceColor
                             opacity: runningMouse.containsMouse ? 1 : 0.94

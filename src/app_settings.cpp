@@ -14,7 +14,7 @@ TaskedSettings::TaskedSettings(QObject *parent) : QObject(parent)
     startButton = settings.value("layout/startButtonEnabled", true).toBool();
     labels = settings.value("layout/labelsEnabled", true).toBool();
     trayWrap = settings.value("layout/trayWrapEnabled", true).toBool();
-    trayScroll = settings.value("layout/trayScrollEnabled", true).toBool();
+    trayScroll = settings.value("layout/trayScrollEnabled", false).toBool();
     themeValue = settings.value("style/theme", 0).toInt();
     font = settings.value("typography/fontFamily", "Segoe UI").toString();
     label = settings.value("typography/labelSize", 9).toInt();
@@ -78,5 +78,5 @@ void TaskedSettings::setBackgroundOpacity(int value) { value = qBound(0, value, 
 void TaskedSettings::setCornerRadius(int value) { value = qBound(10, value, 32); if (radius == value) return; radius = value; QSettings().setValue("style/cornerRadius", radius); emit cornerRadiusChanged(); }
 void TaskedSettings::reset()
 {
-    setSplitMode(false); setSearchEnabled(false); setClockEnabled(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
+    setSplitMode(false); setSearchEnabled(false); setClockEnabled(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22);
 }

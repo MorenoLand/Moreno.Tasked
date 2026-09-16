@@ -91,7 +91,7 @@ private:
     bool startButton = true;
     bool labels = true;
     bool trayWrap = false;
-    bool trayScroll = true;
+    bool trayScroll = false;
     int themeValue = 0;
     QString font = "Segoe UI";
     int label = 9;
