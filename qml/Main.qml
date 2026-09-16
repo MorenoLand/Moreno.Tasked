@@ -379,8 +379,8 @@ Window {
             Grid {
                 id: trayGrid
                 anchors.fill: parent
-                anchors.leftMargin: root.verticalDock ? 0 : 16
-                anchors.rightMargin: root.verticalDock ? 0 : 16 + root.overflowButtonWidth + 12 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
+                anchors.leftMargin: root.verticalDock ? 0 : 16 + root.overflowButtonWidth + 12
+                anchors.rightMargin: root.verticalDock ? 0 : 16 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
                 anchors.topMargin: root.verticalDock ? root.dockSidePadding : 12
                 anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + root.overflowButtonWidth + 12 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? 76 + 12 : 0) : 12
                 columns: 1
@@ -427,7 +427,7 @@ Window {
                 visible: root.trayEnabled
                 width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
                 height: visible ? root.trayCellSize : 0
-                anchors.right: root.verticalDock ? undefined : parent.right
+                anchors.left: root.verticalDock ? undefined : parent.left
                 anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
                 anchors.horizontalCenter: root.verticalDock ? parent.horizontalCenter : undefined
                 anchors.bottom: root.verticalDock ? (combinedClock.visible ? combinedClock.top : parent.bottom) : undefined
@@ -435,7 +435,7 @@ Window {
                 anchors.verticalCenterOffset: root.verticalDock ? 0 : (root.labelsEnabled ? 0 : 6)
                 Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                 Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
-                MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.openPanel() }
+                MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.togglePanel() }
             }
             Item {
                 id: combinedClock
@@ -809,8 +809,10 @@ Window {
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
         transientParent: root
+        onActiveChanged: if (!active && visible) close()
 
         function openPanel() { var point = trayOverflowButton.mapToGlobal(0, 0); var pointX = point.x + (trayOverflowButton.width - width) / 2; var pointY = point.y - height - 10; if (pointY < Screen.virtualY + 8) pointY = point.y + trayOverflowButton.height + 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); show(); raise(); requestActivate() }
+        function togglePanel() { if (visible) close(); else openPanel() }
 
         Rectangle {
             anchors.fill: parent
