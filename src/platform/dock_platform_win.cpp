@@ -393,7 +393,11 @@ void sendShortcut(WORD modifier, WORD key)
     input[2].ki.dwFlags = KEYEVENTF_KEYUP;
     input[3] = input[0];
     input[3].ki.dwFlags = KEYEVENTF_KEYUP;
-    SendInput(4, input, sizeof(INPUT));
+    if (SendInput(4, input, sizeof(INPUT)) == 4) return;
+    keybd_event(static_cast<BYTE>(modifier), 0, 0, 0);
+    keybd_event(static_cast<BYTE>(key), 0, 0, 0);
+    keybd_event(static_cast<BYTE>(key), 0, KEYEVENTF_KEYUP, 0);
+    keybd_event(static_cast<BYTE>(modifier), 0, KEYEVENTF_KEYUP, 0);
 }
 
 void sendQuickSettingsHotkey() { sendShortcut(VK_LWIN, 'A'); }
