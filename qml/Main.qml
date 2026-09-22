@@ -306,6 +306,7 @@ Window {
                         width: root.verticalDock ? root.dockSectionHeight : root.buttonWidth
                         height: root.dockSectionHeight
                         property bool dragged: false
+                        property bool dragPressed: false
                         property int dragIndex: -1
                         opacity: root.taskDragActive && index === root.taskDragSource ? 0 : 1
                         transform: Translate { x: root.taskShift(index).x; y: root.taskShift(index).y }
@@ -336,11 +337,11 @@ Window {
                             property real pressX: 0
                             onEntered: root.schedulePreview(model.windowHandle, runningDelegate, model.title)
                             onExited: root.closePreview()
-                            onPressed: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); pressX = mouse.x; runningDelegate.dragged = false; return } root.dismissPreview(); pressX = mouse.x; runningDelegate.dragged = false; runningDelegate.dragIndex = index }
-                            onPositionChanged: { var point = runningMouse.mapToGlobal(mouse.x, mouse.y); if (Math.abs(mouse.x - pressX) > 6 && !runningDelegate.dragged) { runningDelegate.dragged = true; root.beginTaskDrag(model.iconSource, model.title, runningDelegate.dragIndex, point.x, point.y) } if (runningDelegate.dragged) root.updateTaskDrag(point.x, point.y) }
-                            onReleased: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); var point = runningMouse.mapToGlobal(mouse.x, mouse.y); runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && runningDelegate.dragged) root.endTaskDrag() }
+                            onPressed: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); dragPressed = false; pressX = mouse.x; runningDelegate.dragged = false; return } root.dismissPreview(); dragPressed = true; pressX = mouse.x; runningDelegate.dragged = false; runningDelegate.dragIndex = index }
+                            onPositionChanged: { if (!dragPressed) return; var point = runningMouse.mapToGlobal(mouse.x, mouse.y); if (Math.abs(mouse.x - pressX) > 6 && !runningDelegate.dragged) { runningDelegate.dragged = true; root.beginTaskDrag(model.iconSource, model.title, runningDelegate.dragIndex, point.x, point.y) } if (runningDelegate.dragged) root.updateTaskDrag(point.x, point.y) }
+                            onReleased: { if (mouse.button === Qt.RightButton) { dragPressed = false; root.dismissPreview(); var point = runningMouse.mapToGlobal(mouse.x, mouse.y); runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } dragPressed = false; if (mouse.button === Qt.LeftButton && runningDelegate.dragged) root.endTaskDrag() }
                             onClicked: { root.closePreview(); if (mouse.button === Qt.LeftButton && !runningDelegate.dragged) runningApps.activate(model.windowHandle); runningDelegate.dragged = false; runningDelegate.dragIndex = -1 }
-                            onCanceled: { root.endTaskDrag(); runningDelegate.dragged = false; runningDelegate.dragIndex = -1 }
+                            onCanceled: { dragPressed = false; root.endTaskDrag(); runningDelegate.dragged = false; runningDelegate.dragIndex = -1 }
                         }
                     }
                 }
@@ -371,6 +372,7 @@ Window {
                     width: root.verticalDock ? root.trayListWidth : root.trayCellSize
                     height: root.trayCellSize
                     property bool dragged: false
+                    property bool dragPressed: false
                     property real pressX: 0
                     property real pressY: 0
                     property int dragIndex: -1
@@ -389,11 +391,11 @@ Window {
                         preventStealing: true
                         drag.axis: root.verticalDock ? Drag.YAxis : (root.trayWrapEnabled ? Drag.XAndYAxis : Drag.XAxis)
                         onEntered: trayIcons.activate(model.key, 3)
-                        onPressed: { if (mouse.button === Qt.RightButton) { trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; trayItem.dragIndex = index }
-                        onPositionChanged: { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); var moved = Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5; if (moved && !trayItem.dragged) { trayItem.dragged = true; root.beginTrayDrag(model.key, trayItem.dragIndex, point.x, point.y) } if (trayItem.dragged) { root.updateTrayDrag(point.x, point.y); trayItem.dragIndex = root.reorderTrayItem(trayItem.dragIndex, point.x, point.y) } }
-                        onReleased: { if (mouse.button === Qt.RightButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); root.finishTrayDrag(model.key, point.x, point.y, trayItem.dragged) } }
+                        onPressed: { if (mouse.button === Qt.RightButton) { dragPressed = false; trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; return } dragPressed = true; trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; trayItem.dragIndex = index }
+                        onPositionChanged: { if (!dragPressed) return; var point = trayMouse.mapToGlobal(mouse.x, mouse.y); var moved = Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5; if (moved && !trayItem.dragged) { trayItem.dragged = true; root.beginTrayDrag(model.key, trayItem.dragIndex, point.x, point.y) } if (trayItem.dragged) { root.updateTrayDrag(point.x, point.y); trayItem.dragIndex = root.reorderTrayItem(trayItem.dragIndex, point.x, point.y) } }
+                        onReleased: { if (mouse.button === Qt.RightButton) { dragPressed = false; var point = trayMouse.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } dragPressed = false; if (mouse.button === Qt.LeftButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); root.finishTrayDrag(model.key, point.x, point.y, trayItem.dragged) } }
                         onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) } trayItem.dragged = false; trayItem.dragIndex = -1 }
-                        onCanceled: { root.endTrayDrag(); trayItem.dragged = false; trayItem.dragIndex = -1 }
+                        onCanceled: { dragPressed = false; root.endTrayDrag(); trayItem.dragged = false; trayItem.dragIndex = -1 }
                     }
                 }
             }
@@ -864,6 +866,7 @@ Window {
                         width: root.trayCellSize
                         height: root.trayCellSize
                         property bool dragged: false
+                        property bool dragPressed: false
                         property real pressX: 0
                         property real pressY: 0
                         property int dragIndex: -1
@@ -874,12 +877,12 @@ Window {
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
                             preventStealing: true
                             drag.axis: Drag.XAndYAxis
-                            onPressed: { if (mouse.button === Qt.RightButton) { overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false; return } overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false }
-                            onPositionChanged: { var point = parent.mapToGlobal(mouse.x, mouse.y); var moved = pressed && (Math.abs(mouse.x - overflowItem.pressX) > 5 || Math.abs(mouse.y - overflowItem.pressY) > 5); if (moved && !overflowItem.dragged) { overflowItem.dragged = true; root.beginTrayDrag(model.key, point.x, point.y) } if (overflowItem.dragged) root.updateTrayDrag(point.x, point.y) }
-                            onReleased: { if (mouse.button === Qt.RightButton) { var point = parent.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && overflowItem.dragged) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close(); root.endTrayDrag() } }
+                            onPressed: { if (mouse.button === Qt.RightButton) { dragPressed = false; overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false; return } dragPressed = true; overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false }
+                            onPositionChanged: { if (!dragPressed) return; var point = parent.mapToGlobal(mouse.x, mouse.y); var moved = Math.abs(mouse.x - overflowItem.pressX) > 5 || Math.abs(mouse.y - overflowItem.pressY) > 5; if (moved && !overflowItem.dragged) { overflowItem.dragged = true; root.beginTrayDrag(model.key, -1, point.x, point.y) } if (overflowItem.dragged) root.updateTrayDrag(point.x, point.y) }
+                            onReleased: { if (mouse.button === Qt.RightButton) { dragPressed = false; var point = parent.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } dragPressed = false; if (mouse.button === Qt.LeftButton && overflowItem.dragged) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close(); root.endTrayDrag() } }
                             onDoubleClicked: if (mouse.button === Qt.LeftButton) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close(); root.endTrayDrag() }
                             onClicked: if (mouse.button === Qt.LeftButton && !overflowItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) }
-                            onCanceled: { root.endTrayDrag(); overflowItem.dragged = false }
+                            onCanceled: { dragPressed = false; root.endTrayDrag(); overflowItem.dragged = false }
                         }
                     }
                 }

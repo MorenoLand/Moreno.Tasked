@@ -519,8 +519,8 @@ void positionDock()
     const auto maximumLength = (std::max)(320, (horizontal ? reservation->width() : reservation->height()) - 32);
     const auto currentLength = horizontal ? visual->width() : visual->height();
     const auto length = (std::min)(maximumLength, (std::max)(320, currentLength));
-    if (horizontal) visual->setGeometry(data.rc.left + (reservation->width() - length) / 2, dockPosition == 1 ? monitor.rcMonitor.top + 12 : monitor.rcMonitor.bottom - visual->height() - 12, length, visual->height());
-    else visual->setGeometry(dockPosition == 2 ? monitor.rcMonitor.left + 12 : monitor.rcMonitor.right - visual->width() - 12, monitor.rcMonitor.top + (reservation->height() - length) / 2, visual->width(), length);
+    if (horizontal) visual->setGeometry(data.rc.left + (reservation->width() - length) / 2, dockPosition == 1 ? data.rc.top : data.rc.bottom - visual->height(), length, visual->height());
+    else visual->setGeometry(dockPosition == 2 ? data.rc.left : data.rc.right - visual->width(), data.rc.top + (reservation->height() - length) / 2, visual->width(), length);
 }
 }
 
