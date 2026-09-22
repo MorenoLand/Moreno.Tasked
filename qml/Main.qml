@@ -51,7 +51,8 @@ Window {
     property color surfaceBackgroundColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, surfaceColor.a * dockOpacity * backgroundOpacity)
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
     property color iconSurfaceColor: "transparent"
-    property int dockSectionHeight: verticalDock ? 64 : horizontalWrappedSectionHeight
+    property int dockSectionHeight: 64
+    property int traySectionThickness: Math.max(48, dockSectionHeight - 8)
     property int dockSidePadding: 14
     property int buttonWidth: Math.max(60, iconSize + 18)
     property int visibleButtonCount: (startButtonEnabled ? 1 : 0) + (taskButtonEnabled ? 1 : 0) + (searchEnabled ? 1 : 0)
@@ -66,17 +67,17 @@ Window {
     property int overflowButtonWidth: trayEnabled ? trayCellSize : 0
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * 4)
     property int trayIconsHeight: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * trayFlowSpacing)
-    property int trayWrapFlowWidth: Math.min(448, Math.max(2 * (trayCellSize + trayFlowSpacing) - trayFlowSpacing, Math.ceil(Math.max(1, dockTrayIcons.count) / 2) * (trayCellSize + trayFlowSpacing) - trayFlowSpacing))
+    property int trayWrapMaxRows: Math.max(1, Math.floor((traySectionThickness - 8 + trayFlowSpacing) / (trayCellSize + trayFlowSpacing)))
+    property int trayWrapFlowWidth: Math.max(2 * (trayCellSize + trayFlowSpacing) - trayFlowSpacing, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapMaxRows) * (trayCellSize + trayFlowSpacing) - trayFlowSpacing)
     property int trayWrapColumns: !verticalDock ? Math.max(1, Math.floor((trayWrapFlowWidth + trayFlowSpacing) / (trayCellSize + trayFlowSpacing))) : 1
     property int trayWrapRows: !verticalDock ? Math.max(1, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapColumns)) : Math.max(1, dockTrayIcons.count)
-    property int trayFlowWidth: trayEnabled ? (verticalDock ? dockSectionHeight : (trayWrapEnabled ? trayWrapFlowWidth + trayCellSize + trayFlowSpacing : trayScrollEnabled ? 448 : unwrappedTrayWidth + trayCellSize + trayFlowSpacing)) : 0
+    property int trayFlowWidth: trayEnabled ? (verticalDock ? traySectionThickness : (trayWrapEnabled ? trayWrapFlowWidth + trayCellSize + trayFlowSpacing : trayScrollEnabled ? 448 : unwrappedTrayWidth + trayCellSize + trayFlowSpacing)) : 0
     property int trayContentHeight: trayEnabled ? (verticalDock ? trayCellSize + trayFlowSpacing + trayIconsHeight : (trayWrapEnabled ? trayWrapRows * trayCellSize + Math.max(0, trayWrapRows - 1) * trayFlowSpacing : 40)) : 0
-    property int horizontalWrappedSectionHeight: trayEnabled && trayWrapEnabled ? Math.max(64, trayContentHeight + 24) : 64
     property bool clockSectionVisible: clockEnabled && (splitMode || !trayEnabled)
     property int clockSectionWidth: clockSectionVisible && !verticalDock ? clockWidth : 0
-    property int rightWidth: trayEnabled ? (verticalDock ? dockSectionHeight : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
+    property int rightWidth: trayEnabled ? (verticalDock ? traySectionThickness : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
     property int trayListWidth: trayEnabled ? trayFlowWidth : 0
-    property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : dockSectionHeight) : 0
+    property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : traySectionThickness) : 0
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
     property int middleHeight: Math.max(320, runningList.count * dockSectionHeight + 28)
     property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)
@@ -365,7 +366,7 @@ Window {
             visible: root.trayEnabled
             property real freeX: taskedSettings.sectionOffsetX("tray")
             property real freeY: taskedSettings.sectionOffsetY("tray")
-            transform: Translate { x: root.splitTrayOffsetX + (root.dockLocked ? 0 : trayPanel.freeX); y: root.splitTrayOffsetY + (root.dockLocked ? 0 : trayPanel.freeY) }
+            transform: Translate { x: (root.verticalDock ? (root.dockSectionHeight - root.trayFlowWidth) / 2 : 0) + root.splitTrayOffsetX + (root.dockLocked ? 0 : trayPanel.freeX); y: (root.verticalDock ? 0 : (root.dockSectionHeight - root.trayHeight) / 2) + root.splitTrayOffsetY + (root.dockLocked ? 0 : trayPanel.freeY) }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
             Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
@@ -410,8 +411,8 @@ Window {
                 anchors.fill: parent
                 anchors.leftMargin: root.verticalDock ? 0 : 16
                 anchors.rightMargin: root.verticalDock ? 0 : 16 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
-                anchors.topMargin: root.verticalDock ? root.dockSidePadding : 12
-                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.dockSectionHeight + 12 : 0) : 12
+                anchors.topMargin: root.verticalDock ? root.dockSidePadding : (root.trayWrapEnabled ? 4 : 8)
+                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.dockSectionHeight + 12 : 0) : (root.trayWrapEnabled ? 4 : 8)
                 columns: 1
                 columnSpacing: root.verticalDock ? 0 : 12
                 rowSpacing: root.verticalDock ? 12 : 0
