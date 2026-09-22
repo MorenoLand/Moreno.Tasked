@@ -185,9 +185,10 @@ Window {
                         anchors.top: parent.top
                         anchors.topMargin: root.iconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
-                        color: "transparent"
+                        color: root.accentColor
                         scale: startMouse.containsMouse ? 1.1 : 1
                         Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
+                        Rectangle { anchors.fill: parent; radius: parent.radius; gradient: Gradient { GradientStop { position: 0; color: Qt.lighter(root.accentColor, 1.3) } GradientStop { position: 1; color: Qt.darker(root.accentColor, 1.25) } } opacity: 0.72 }
                         Grid {
                             anchors.centerIn: parent
                             columns: 2
