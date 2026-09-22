@@ -91,6 +91,7 @@ Window {
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 4 : 8
+    property int buttonIconTopMargin: iconTopMargin + (labelsEnabled ? 0 : 4)
     property int preferredDockWidth: splitSpreadMode && !verticalDock ? Math.max(1080, Screen.width - 32) : Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
     property int preferredDockHeight: splitSpreadMode && verticalDock ? Math.max(320, Screen.height - 32) : Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1))
     property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
@@ -202,7 +203,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: root.iconTopMargin
+                        anchors.topMargin: root.buttonIconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: root.accentColor
                         scale: startMouse.containsMouse ? 1.1 : 1
@@ -231,7 +232,7 @@ Window {
                         height: root.iconSize
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
-                        anchors.topMargin: root.iconTopMargin
+                        anchors.topMargin: root.buttonIconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
                         color: "transparent"
                         scale: taskMouse.containsMouse ? 1.1 : 1
