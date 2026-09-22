@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <array>
 #include <cwchar>
-#include <unordered_map>
 
 namespace {
 constexpr UINT callbackMessage = WM_APP + 0x47;
@@ -27,7 +26,6 @@ QWindow *reservation = nullptr;
 QWindow *visual = nullptr;
 HWND appbarHandle = nullptr;
 bool appbarRegistered = false;
-std::unordered_map<HMONITOR, RECT> originalWorkAreas;
 QAbstractNativeEventFilter *eventFilter = nullptr;
 QVector<HWND> hiddenTaskbars;
 int dockHeight = 92;
@@ -499,36 +497,34 @@ public:
 
 void positionDock()
 {
-    if (!visual || positioningDock) return;
+    if (!appbarRegistered || !visual || positioningDock) return;
     positioningDock = true;
     APPBARDATA data{};
     data.cbSize = sizeof(data);
-    data.hWnd = appbarRegistered ? appbarHandle : nativeHandle(visual);
+    data.hWnd = appbarHandle;
     data.uEdge = dockPosition == 0 ? ABE_BOTTOM : dockPosition == 1 ? ABE_TOP : dockPosition == 2 ? ABE_LEFT : ABE_RIGHT;
     const auto monitorHandle = MonitorFromWindow(data.hWnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO monitor{ sizeof(monitor) };
     GetMonitorInfoW(monitorHandle, &monitor);
-    auto originalWorkArea = originalWorkAreas.find(monitorHandle);
-    if (originalWorkArea == originalWorkAreas.end()) originalWorkArea = originalWorkAreas.emplace(monitorHandle, monitor.rcWork).first;
     if (monitorHandle != positionedMonitor) { positionedMonitor = monitorHandle; positionedAppbarThickness = 0; }
-    if (appbarRegistered) {
-        const auto reservedEdge = dockPosition == 0 ? monitor.rcMonitor.bottom - monitor.rcWork.bottom : dockPosition == 1 ? monitor.rcWork.top - monitor.rcMonitor.top : dockPosition == 2 ? monitor.rcWork.left - monitor.rcMonitor.left : monitor.rcMonitor.right - monitor.rcWork.right;
-        const auto reservedByOthers = static_cast<int>((std::max)(0L, reservedEdge - static_cast<LONG>(positionedAppbarThickness)));
-        const auto additionalThickness = (std::max)(1, dockHeight - reservedByOthers);
-        data.rc = monitor.rcMonitor;
-        if (dockPosition == 0) data.rc.top = data.rc.bottom - additionalThickness;
-        else if (dockPosition == 1) data.rc.bottom = data.rc.top + additionalThickness;
-        else if (dockPosition == 2) data.rc.right = data.rc.left + additionalThickness;
-        else data.rc.left = data.rc.right - additionalThickness;
-        SHAppBarMessage(ABM_QUERYPOS, &data);
-        if (dockPosition == 0) data.rc.top = data.rc.bottom - additionalThickness;
-        else if (dockPosition == 1) data.rc.bottom = data.rc.top + additionalThickness;
-        else if (dockPosition == 2) data.rc.right = data.rc.left + additionalThickness;
-        else data.rc.left = data.rc.right - additionalThickness;
-        SHAppBarMessage(ABM_SETPOS, &data);
-        positionedAppbarThickness = dockPosition < 2 ? data.rc.bottom - data.rc.top : data.rc.right - data.rc.left;
-        SetWindowPos(data.hWnd, nullptr, data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top, SWP_NOACTIVATE | SWP_NOZORDER);
-    }
+    const auto reservedEdge = dockPosition == 0 ? monitor.rcMonitor.bottom - monitor.rcWork.bottom : dockPosition == 1 ? monitor.rcWork.top - monitor.rcMonitor.top : dockPosition == 2 ? monitor.rcWork.left - monitor.rcMonitor.left : monitor.rcMonitor.right - monitor.rcWork.right;
+    const auto reservedByOthers = static_cast<int>((std::max)(0L, reservedEdge - static_cast<LONG>(positionedAppbarThickness)));
+    const auto additionalThickness = (std::max)(1, dockHeight - reservedByOthers);
+    data.rc = monitor.rcMonitor;
+    if (dockPosition == 0) data.rc.top = data.rc.bottom - additionalThickness;
+    else if (dockPosition == 1) data.rc.bottom = data.rc.top + additionalThickness;
+    else if (dockPosition == 2) data.rc.right = data.rc.left + additionalThickness;
+    else data.rc.left = data.rc.right - additionalThickness;
+    SHAppBarMessage(ABM_QUERYPOS, &data);
+    if (dockPosition == 0) data.rc.top = data.rc.bottom - additionalThickness;
+    else if (dockPosition == 1) data.rc.bottom = data.rc.top + additionalThickness;
+    else if (dockPosition == 2) data.rc.right = data.rc.left + additionalThickness;
+    else data.rc.left = data.rc.right - additionalThickness;
+    RECT currentRect{};
+    const auto samePosition = GetWindowRect(data.hWnd, &currentRect) && currentRect.left == data.rc.left && currentRect.top == data.rc.top && currentRect.right == data.rc.right && currentRect.bottom == data.rc.bottom;
+    if (!samePosition) SHAppBarMessage(ABM_SETPOS, &data);
+    positionedAppbarThickness = dockPosition < 2 ? data.rc.bottom - data.rc.top : data.rc.right - data.rc.left;
+    if (!samePosition) SetWindowPos(data.hWnd, nullptr, data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top, SWP_NOACTIVATE | SWP_NOZORDER);
     const auto horizontal = dockPosition < 2;
     const auto screen = visual->screen() ? visual->screen() : QGuiApplication::primaryScreen();
     const auto screenGeometry = screen->geometry();
@@ -537,12 +533,6 @@ void positionDock()
     const auto length = (std::min)(maximumLength, (std::max)(320, currentLength));
     if (horizontal) visual->setGeometry(screenGeometry.left() + (screenGeometry.width() - length) / 2, dockPosition == 1 ? screenGeometry.top() : screenGeometry.top() + screenGeometry.height() - visual->height(), length, visual->height());
     else visual->setGeometry(dockPosition == 2 ? screenGeometry.left() : screenGeometry.left() + screenGeometry.width() - visual->width(), screenGeometry.top() + (screenGeometry.height() - length) / 2, visual->width(), length);
-    RECT workArea = originalWorkArea->second;
-    if (dockPosition == 0) workArea.bottom = (std::min)(workArea.bottom, monitor.rcMonitor.bottom - dockHeight);
-    else if (dockPosition == 1) workArea.top = (std::max)(workArea.top, monitor.rcMonitor.top + dockHeight);
-    else if (dockPosition == 2) workArea.left = (std::max)(workArea.left, monitor.rcMonitor.left + dockHeight);
-    else workArea.right = (std::min)(workArea.right, monitor.rcMonitor.right - dockHeight);
-    if (workArea.left != monitor.rcWork.left || workArea.top != monitor.rcWork.top || workArea.right != monitor.rcWork.right || workArea.bottom != monitor.rcWork.bottom) SystemParametersInfoW(SPI_SETWORKAREA, 0, &workArea, SPIF_SENDCHANGE);
     positioningDock = false;
 }
 }
@@ -579,14 +569,12 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height, int posit
     dockHeight = qRound(height * visualWindow->devicePixelRatio());
     dockPosition = (std::max)(0, (std::min)(3, position));
     taskbarCreatedMessage = RegisterWindowMessageW(L"TaskbarCreated");
-    if (startTaskbarGuard()) {
-        hideTaskbars();
-        takeover = true;
-    }
+    const auto taskbarGuardStarted = startTaskbarGuard();
     reservation = new QWindow;
     reservation->setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::WindowTransparentForInput);
     reservation->setOpacity(0.0);
     reservation->show();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     APPBARDATA data{};
     data.cbSize = sizeof(data);
     data.hWnd = nativeHandle(reservation);
@@ -602,6 +590,7 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height, int posit
     QObject::connect(fullscreenTimer, &QTimer::timeout, updateFullscreenVisibility);
     fullscreenTimer->start();
     positionDock();
+    if (taskbarGuardStarted) { hideTaskbars(); takeover = true; positionDock(); }
     return visual->geometry();
 }
 
@@ -622,8 +611,6 @@ void tasked::platform::uninstallDock()
         appbarRegistered = false;
         appbarHandle = nullptr;
     }
-    for (const auto &entry : originalWorkAreas) { auto workArea = entry.second; SystemParametersInfoW(SPI_SETWORKAREA, 0, &workArea, SPIF_SENDCHANGE); }
-    originalWorkAreas.clear();
     if (eventFilter) {
         qApp->removeNativeEventFilter(eventFilter);
         delete eventFilter;
