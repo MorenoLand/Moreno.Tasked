@@ -510,11 +510,20 @@ void RunningAppsModel::activate(const QString &windowHandle)
         }
         const auto targetThread = GetWindowThreadProcessId(window, nullptr);
         const auto currentThread = GetCurrentThreadId();
+        DWORD targetProcess = 0;
+        GetWindowThreadProcessId(window, &targetProcess);
+        AllowSetForegroundWindow(targetProcess);
         const auto attached = targetThread && targetThread != currentThread && AttachThreadInput(currentThread, targetThread, TRUE);
-        ShowWindowAsync(window, SW_RESTORE);
+        WINDOWPLACEMENT placement{ sizeof(WINDOWPLACEMENT) };
+        if (GetWindowPlacement(window, &placement) && placement.showCmd == SW_SHOWMINIMIZED) {
+            placement.showCmd = SW_RESTORE;
+            SetWindowPlacement(window, &placement);
+        }
+        ShowWindow(window, SW_RESTORE);
         BringWindowToTop(window);
         SetForegroundWindow(window);
         if (GetForegroundWindow() != window) SwitchToThisWindow(window, TRUE);
+        if (attached) SetFocus(window);
         if (attached) AttachThreadInput(currentThread, targetThread, FALSE);
     }
 #else
