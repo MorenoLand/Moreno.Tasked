@@ -148,6 +148,7 @@ Window {
         width: dock.width
         height: dock.height
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.verticalDock || root.dockPosition !== 0 ? 0 : 8
         anchors.horizontalCenter: parent.horizontalCenter
         radius: root.cornerRadius
         color: root.surfaceBackgroundColor
@@ -162,6 +163,7 @@ Window {
         width: root.splitSpreadMode && !root.verticalDock ? root.width - 28 : implicitWidth
         height: root.splitSpreadMode && root.verticalDock ? root.height - 28 : implicitHeight
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.verticalDock || root.dockPosition !== 0 ? 0 : 8
         anchors.horizontalCenter: parent.horizontalCenter
         columns: root.verticalDock ? 1 : (root.splitMode || !root.trayEnabled ? 4 : 3)
         columnSpacing: root.verticalDock ? 0 : root.sectionGap
