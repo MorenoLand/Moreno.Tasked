@@ -51,7 +51,7 @@ Window {
     property color surfaceBackgroundColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, surfaceColor.a * dockOpacity * backgroundOpacity)
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
     property color iconSurfaceColor: "transparent"
-    property int dockSectionHeight: 64
+    property int dockSectionHeight: verticalDock ? 64 : horizontalWrappedSectionHeight
     property int dockSidePadding: 14
     property int buttonWidth: Math.max(60, iconSize + 18)
     property int visibleButtonCount: (startButtonEnabled ? 1 : 0) + (taskButtonEnabled ? 1 : 0) + (searchEnabled ? 1 : 0)
@@ -71,11 +71,12 @@ Window {
     property int trayWrapRows: !verticalDock ? Math.max(1, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapColumns)) : Math.max(1, dockTrayIcons.count)
     property int trayFlowWidth: trayEnabled ? (verticalDock ? dockSectionHeight : (trayWrapEnabled ? trayWrapFlowWidth + trayCellSize + trayFlowSpacing : trayScrollEnabled ? 448 : unwrappedTrayWidth + trayCellSize + trayFlowSpacing)) : 0
     property int trayContentHeight: trayEnabled ? (verticalDock ? trayCellSize + trayFlowSpacing + trayIconsHeight : (trayWrapEnabled ? trayWrapRows * trayCellSize + Math.max(0, trayWrapRows - 1) * trayFlowSpacing : 40)) : 0
+    property int horizontalWrappedSectionHeight: trayEnabled && trayWrapEnabled ? Math.max(64, trayContentHeight + 24) : 64
     property bool clockSectionVisible: clockEnabled && (splitMode || !trayEnabled)
     property int clockSectionWidth: clockSectionVisible && !verticalDock ? clockWidth : 0
     property int rightWidth: trayEnabled ? (verticalDock ? dockSectionHeight : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
     property int trayListWidth: trayEnabled ? trayFlowWidth : 0
-    property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : Math.max(dockSectionHeight, trayContentHeight + 24)) : 0
+    property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : dockSectionHeight) : 0
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
     property int middleHeight: Math.max(320, runningList.count * dockSectionHeight + 28)
     property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)

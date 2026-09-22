@@ -2,8 +2,10 @@
 
 #include <QAbstractNativeEventFilter>
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QRect>
 #include <QProcess>
+#include <QScreen>
 #include <QStringList>
 #include <QTimer>
 #include <QVector>
@@ -27,6 +29,8 @@ QVector<HWND> hiddenTaskbars;
 int dockHeight = 92;
 int dockPosition = 0;
 bool positioningDock = false;
+HMONITOR positionedMonitor = nullptr;
+int positionedAppbarThickness = 0;
 UINT taskbarCreatedMessage = 0;
 bool takeover = false;
 QTimer *startPositionTimer = nullptr;
@@ -497,27 +501,35 @@ void positionDock()
     data.cbSize = sizeof(data);
     data.hWnd = nativeHandle(reservation);
     data.uEdge = dockPosition == 0 ? ABE_BOTTOM : dockPosition == 1 ? ABE_TOP : dockPosition == 2 ? ABE_LEFT : ABE_RIGHT;
+    const auto monitorHandle = MonitorFromWindow(data.hWnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO monitor{ sizeof(monitor) };
-    GetMonitorInfoW(MonitorFromWindow(data.hWnd, MONITOR_DEFAULTTONEAREST), &monitor);
+    GetMonitorInfoW(monitorHandle, &monitor);
+    if (monitorHandle != positionedMonitor) { positionedMonitor = monitorHandle; positionedAppbarThickness = 0; }
+    const auto reservedEdge = dockPosition == 0 ? monitor.rcMonitor.bottom - monitor.rcWork.bottom : dockPosition == 1 ? monitor.rcWork.top - monitor.rcMonitor.top : dockPosition == 2 ? monitor.rcWork.left - monitor.rcMonitor.left : monitor.rcMonitor.right - monitor.rcWork.right;
+    const auto reservedByOthers = static_cast<int>((std::max)(0L, reservedEdge - static_cast<LONG>(positionedAppbarThickness)));
+    const auto additionalThickness = (std::max)(1, dockHeight - reservedByOthers);
     data.rc = monitor.rcMonitor;
-    if (dockPosition == 0) data.rc.top = data.rc.bottom - dockHeight;
-    else if (dockPosition == 1) data.rc.bottom = data.rc.top + dockHeight;
-    else if (dockPosition == 2) data.rc.right = data.rc.left + dockHeight;
-    else data.rc.left = data.rc.right - dockHeight;
+    if (dockPosition == 0) data.rc.top = data.rc.bottom - additionalThickness;
+    else if (dockPosition == 1) data.rc.bottom = data.rc.top + additionalThickness;
+    else if (dockPosition == 2) data.rc.right = data.rc.left + additionalThickness;
+    else data.rc.left = data.rc.right - additionalThickness;
     SHAppBarMessage(ABM_QUERYPOS, &data);
-    if (dockPosition == 0) data.rc.top = data.rc.bottom - dockHeight;
-    else if (dockPosition == 1) data.rc.bottom = data.rc.top + dockHeight;
-    else if (dockPosition == 2) data.rc.right = data.rc.left + dockHeight;
-    else data.rc.left = data.rc.right - dockHeight;
+    if (dockPosition == 0) data.rc.top = data.rc.bottom - additionalThickness;
+    else if (dockPosition == 1) data.rc.bottom = data.rc.top + additionalThickness;
+    else if (dockPosition == 2) data.rc.right = data.rc.left + additionalThickness;
+    else data.rc.left = data.rc.right - additionalThickness;
     SHAppBarMessage(ABM_SETPOS, &data);
-    reservation->setGeometry(data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top);
+    positionedAppbarThickness = dockPosition < 2 ? data.rc.bottom - data.rc.top : data.rc.right - data.rc.left;
+    SetWindowPos(data.hWnd, nullptr, data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top, SWP_NOACTIVATE | SWP_NOZORDER);
     if (!visual) { positioningDock = false; return; }
     const auto horizontal = dockPosition < 2;
-    const auto maximumLength = (std::max)(320, (horizontal ? reservation->width() : reservation->height()) - 32);
+    const auto screen = visual->screen() ? visual->screen() : QGuiApplication::primaryScreen();
+    const auto screenGeometry = screen->geometry();
+    const auto maximumLength = (std::max)(320, (horizontal ? screenGeometry.width() : screenGeometry.height()) - 32);
     const auto currentLength = horizontal ? visual->width() : visual->height();
     const auto length = (std::min)(maximumLength, (std::max)(320, currentLength));
-    if (horizontal) visual->setGeometry(data.rc.left + (reservation->width() - length) / 2, dockPosition == 1 ? data.rc.top : data.rc.bottom - visual->height(), length, visual->height());
-    else visual->setGeometry(dockPosition == 2 ? data.rc.left : data.rc.right - visual->width(), data.rc.top + (reservation->height() - length) / 2, visual->width(), length);
+    if (horizontal) visual->setGeometry(screenGeometry.left() + (screenGeometry.width() - length) / 2, dockPosition == 1 ? screenGeometry.top() : screenGeometry.top() + screenGeometry.height() - visual->height(), length, visual->height());
+    else visual->setGeometry(dockPosition == 2 ? screenGeometry.left() : screenGeometry.left() + screenGeometry.width() - visual->width(), screenGeometry.top() + (screenGeometry.height() - length) / 2, visual->width(), length);
     positioningDock = false;
 }
 }
@@ -551,7 +563,7 @@ void tasked::platform::showSystemTrayFlyout(const QRect &anchor) { trayFlyoutMon
 QRect tasked::platform::installDock(QWindow *visualWindow, int height, int position)
 {
     visual = visualWindow;
-    dockHeight = height;
+    dockHeight = qRound(height * visualWindow->devicePixelRatio());
     dockPosition = (std::max)(0, (std::min)(3, position));
     taskbarCreatedMessage = RegisterWindowMessageW(L"TaskbarCreated");
     if (startTaskbarGuard()) {
@@ -569,8 +581,8 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height, int posit
     SHAppBarMessage(ABM_NEW, &data);
     eventFilter = new DockEventFilter;
     qApp->installNativeEventFilter(eventFilter);
-    QObject::connect(visual, &QWindow::widthChanged, visual, [](int width) { if (dockPosition > 1) dockHeight = width; positionDock(); });
-    QObject::connect(visual, &QWindow::heightChanged, visual, [](int height) { if (dockPosition < 2) dockHeight = height; positionDock(); });
+    QObject::connect(visual, &QWindow::widthChanged, visual, [](int width) { if (dockPosition > 1) dockHeight = qRound(width * visual->devicePixelRatio()); positionDock(); });
+    QObject::connect(visual, &QWindow::heightChanged, visual, [](int height) { if (dockPosition < 2) dockHeight = qRound(height * visual->devicePixelRatio()); positionDock(); });
     fullscreenTimer = new QTimer(qApp);
     fullscreenTimer->setInterval(250);
     QObject::connect(fullscreenTimer, &QTimer::timeout, updateFullscreenVisibility);
@@ -582,7 +594,7 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height, int posit
 void tasked::platform::setDockPosition(int position)
 {
     dockPosition = (std::max)(0, (std::min)(3, position));
-    if (visual) dockHeight = dockPosition < 2 ? visual->height() : visual->width();
+    if (visual) dockHeight = qRound((dockPosition < 2 ? visual->height() : visual->width()) * visual->devicePixelRatio());
     positionDock();
 }
 
