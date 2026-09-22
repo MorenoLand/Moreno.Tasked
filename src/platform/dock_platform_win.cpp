@@ -498,20 +498,15 @@ void positionDock()
     MONITORINFO monitor{ sizeof(monitor) };
     GetMonitorInfoW(MonitorFromWindow(data.hWnd, MONITOR_DEFAULTTONEAREST), &monitor);
     data.rc = monitor.rcMonitor;
+    if (dockPosition == 0) data.rc.top = data.rc.bottom - dockHeight;
+    else if (dockPosition == 1) data.rc.bottom = data.rc.top + dockHeight;
+    else if (dockPosition == 2) data.rc.right = data.rc.left + dockHeight;
+    else data.rc.left = data.rc.right - dockHeight;
     SHAppBarMessage(ABM_QUERYPOS, &data);
-    if (dockPosition == 0) {
-        data.rc.bottom = monitor.rcMonitor.bottom;
-        data.rc.top = data.rc.bottom - dockHeight;
-    } else if (dockPosition == 1) {
-        data.rc.top = monitor.rcMonitor.top;
-        data.rc.bottom = data.rc.top + dockHeight;
-    } else if (dockPosition == 2) {
-        data.rc.left = monitor.rcMonitor.left;
-        data.rc.right = data.rc.left + dockHeight;
-    } else {
-        data.rc.right = monitor.rcMonitor.right;
-        data.rc.left = data.rc.right - dockHeight;
-    }
+    if (dockPosition == 0) data.rc.top = data.rc.bottom - dockHeight;
+    else if (dockPosition == 1) data.rc.bottom = data.rc.top + dockHeight;
+    else if (dockPosition == 2) data.rc.right = data.rc.left + dockHeight;
+    else data.rc.left = data.rc.right - dockHeight;
     SHAppBarMessage(ABM_SETPOS, &data);
     reservation->setGeometry(data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top);
     if (!visual) return;

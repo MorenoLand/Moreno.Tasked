@@ -1,8 +1,10 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QHash>
 #include <QImage>
 #include <QPixmap>
+#include <QReadWriteLock>
 #include <QRect>
 #include <QSortFilterProxyModel>
 #include <QStringList>
@@ -32,8 +34,9 @@ private:
 class TrayModel final : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(quint64 iconRevision READ iconRevision NOTIFY iconRevisionChanged)
 public:
-    struct Item { qulonglong key = 0; qulonglong owner = 0; quint32 id = 0; quint32 callback = 0; quint32 version = 0; quintptr icon = 0; QString tooltip; QImage image; QString automationId; int ordinal = 0; quintptr automationElement = 0; QRect bounds; };
+    struct Item { qulonglong key = 0; qulonglong owner = 0; quint32 id = 0; quint32 callback = 0; quint32 version = 0; quintptr icon = 0; QString tooltip; QImage image; QImage iconImage; QString automationId; int ordinal = 0; quintptr automationElement = 0; QRect bounds; };
     enum Role { KeyRole = Qt::UserRole + 1, TooltipRole };
     explicit TrayModel(QObject *parent = nullptr);
     ~TrayModel() override;
@@ -41,6 +44,7 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
     QPixmap icon(qulonglong key, const QSize &requestedSize) const;
+    quint64 iconRevision() const { return imageRevision; }
     Q_INVOKABLE void activate(const QString &key, int action);
     Q_INVOKABLE void showContextMenu(const QString &key, int x, int y);
     Q_INVOKABLE bool isOverflow(const QString &key) const;
@@ -49,6 +53,7 @@ public:
     void reorder(const QStringList &orderedKeys, bool overflowOnly);
 signals:
     void overflowChanged();
+    void iconRevisionChanged();
 private:
     void refresh();
     void applySavedOrder(QVector<Item> &next) const;
@@ -56,6 +61,9 @@ private:
     QVector<Item> items;
     QStringList overflowKeys;
     QStringList trayOrder;
+    mutable QReadWriteLock iconImageLock;
+    QHash<qulonglong, QImage> iconImages;
+    quint64 imageRevision = 0;
     QTimer timer;
 };
 

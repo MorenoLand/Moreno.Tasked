@@ -7,7 +7,7 @@ TrayIconProvider::TrayIconProvider(TrayModel *model) : QQuickImageProvider(QQuic
 QPixmap TrayIconProvider::requestPixmap(const QString &id, QSize *size, const QSize &requestedSize)
 {
     bool ok = false;
-    const auto key = id.toULongLong(&ok);
+    const auto key = id.section(QLatin1Char('?'), 0, 0).toULongLong(&ok);
     const auto requested = requestedSize.isValid() ? requestedSize : QSize(32, 32);
     if (size) *size = requested;
     return ok && model ? model->icon(key, requested) : QPixmap();

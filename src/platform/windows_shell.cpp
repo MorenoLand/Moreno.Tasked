@@ -3,6 +3,8 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QRect>
+#include <QReadLocker>
+#include <QWriteLocker>
 #include <QSet>
 #include <QSettings>
 #include <QThread>
@@ -235,6 +237,15 @@ QImage captureTrayIcon(const RECT &bounds)
     QRect content;
     for (int yPixel = 0; yPixel < image.height(); ++yPixel) for (int xPixel = 0; xPixel < image.width(); ++xPixel) if (qAlpha(image.pixel(xPixel, yPixel)) > 40) content |= QRect(xPixel, yPixel, 1, 1);
     return content.isValid() ? image.copy(content.adjusted(-2, -2, 2, 2).intersected(image.rect())) : QImage();
+}
+
+QImage trayIconImage(quintptr handle)
+{
+    const auto copy = CopyIcon(reinterpret_cast<HICON>(handle));
+    if (!copy) return {};
+    auto image = QImage::fromHICON(copy);
+    DestroyIcon(copy);
+    return image;
 }
 
 IUIAutomation *automation()
@@ -716,12 +727,22 @@ void TrayModel::refresh()
     }
     applySavedOrder(next);
     for (auto &item : next) {
+        if (item.icon) item.iconImage = trayIconImage(item.icon);
         const auto old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.key == item.key; });
-        if (old != items.cend() && item.image.isNull()) item.image = old->image;
+        if (old != items.cend() && item.icon == old->icon) {
+            if (item.image.isNull()) item.image = old->image;
+            if (item.iconImage.isNull()) item.iconImage = old->iconImage;
+        }
+    }
+    QHash<qulonglong, QImage> nextIconImages;
+    for (const auto &item : next) {
+        auto image = !item.iconImage.isNull() ? item.iconImage : item.image;
+        if (image.isNull() && item.owner) image = iconFromPath(processPath(reinterpret_cast<HWND>(static_cast<quintptr>(item.owner))), QSize(32, 32)).toImage();
+        if (!image.isNull()) nextIconImages.insert(item.key, std::move(image));
     }
     if (next.size() == items.size()) {
         bool same = true;
-        for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).owner != items.at(i).owner || next.at(i).id != items.at(i).id || next.at(i).callback != items.at(i).callback || next.at(i).version != items.at(i).version || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).image.isNull() != items.at(i).image.isNull()) { same = false; break; }
+        for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).owner != items.at(i).owner || next.at(i).id != items.at(i).id || next.at(i).callback != items.at(i).callback || next.at(i).version != items.at(i).version || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).image != items.at(i).image || next.at(i).iconImage != items.at(i).iconImage) { same = false; break; }
         if (same) {
             releaseAutomationItems(next);
             if (recover) ShowWindow(shell, SW_HIDE);
@@ -731,7 +752,13 @@ void TrayModel::refresh()
     beginResetModel();
     releaseAutomationItems(items);
     items = std::move(next);
+    {
+        QWriteLocker locker(&iconImageLock);
+        iconImages = std::move(nextIconImages);
+    }
+    ++imageRevision;
     endResetModel();
+    emit iconRevisionChanged();
     if (recover) ShowWindow(shell, SW_HIDE);
 #endif
 }
@@ -740,16 +767,12 @@ QPixmap TrayModel::icon(qulonglong key, const QSize &requestedSize) const
 {
 #ifdef Q_OS_WIN
     const auto requested = requestedSize.isValid() ? requestedSize : QSize(32, 32);
-    const auto found = std::find_if(items.cbegin(), items.cend(), [key](const Item &item) { return item.key == key; });
-    if (found == items.cend()) return {};
-    const auto copy = CopyIcon(reinterpret_cast<HICON>(found->icon));
-    if (copy) {
-        const auto image = QImage::fromHICON(copy);
-        DestroyIcon(copy);
-        if (!image.isNull()) return QPixmap::fromImage(image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    QImage image;
+    {
+        QReadLocker locker(&iconImageLock);
+        image = iconImages.value(key);
     }
-    if (!found->image.isNull()) return QPixmap::fromImage(found->image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    return iconFromPath(processPath(reinterpret_cast<HWND>(static_cast<quintptr>(found->owner))), requested);
+    return image.isNull() ? QPixmap() : QPixmap::fromImage(image.scaled(requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 #else
     Q_UNUSED(key);
     Q_UNUSED(requestedSize);
