@@ -105,6 +105,13 @@ Window {
     function showSystemTrayFlyout() { var point = trayPanel.mapToGlobal(0, 0); launcher.showSystemTrayFlyout(Math.round(point.x), Math.round(point.y), Math.round(trayPanel.width), Math.round(trayPanel.height)) }
     function showStartMenu() { var point = startButton.mapToGlobal(0, 0); launcher.showStartMenu(Math.round(point.x), Math.round(point.y), Math.round(startButton.width), Math.round(startButton.height)) }
     function showRunDialog() { var point = root.startButtonEnabled ? startButton.mapToGlobal(0, 0) : dock.mapToGlobal(0, 0); var width = root.startButtonEnabled ? startButton.width : root.dockSectionHeight; var height = root.startButtonEnabled ? startButton.height : root.dockSectionHeight; launcher.showRunDialog(Math.round(point.x), Math.round(point.y), Math.round(width), Math.round(height)) }
+    function pointInsideItem(item, x, y) { var point = item.mapToGlobal(0, 0); return x >= point.x && x <= point.x + item.width && y >= point.y && y <= point.y + item.height }
+    function pointInsideWindow(window, x, y) { return window.visible && x >= window.x && x <= window.x + window.width && y >= window.y && y <= window.y + window.height }
+    function beginTrayDrag(key, x, y) { trayDragWindow.dragKey = key; trayDragWindow.x = Math.round(x - trayDragWindow.width / 2); trayDragWindow.y = Math.round(y - trayDragWindow.height / 2); trayDragWindow.show(); trayDragWindow.raise() }
+    function updateTrayDrag(x, y) { trayDragWindow.x = Math.round(x - trayDragWindow.width / 2); trayDragWindow.y = Math.round(y - trayDragWindow.height / 2); var overCaret = pointInsideItem(trayOverflowButton, x, y); var overDrawer = pointInsideWindow(trayOverflowWindow, x, y); if (overCaret) trayOverflowWindow.openPanel(); if (overCaret || overDrawer) trayDrawerCloseTimer.stop(); else if (trayOverflowWindow.visible) trayDrawerCloseTimer.restart() }
+    function reorderTrayItem(from, x, y) { var local; var target; if (root.verticalDock) { local = trayList.mapFromGlobal(x, y); target = Math.round((local.y + trayList.contentY + trayCellSize / 2) / (trayCellSize + 4)) } else if (root.trayWrapEnabled) { local = trayFlow.mapFromGlobal(x, y); var columns = Math.max(1, root.trayWrapColumns); target = Math.floor(Math.max(0, local.y) / (trayCellSize + trayFlowSpacing)) * columns + Math.round((local.x - trayCellSize / 2) / (trayCellSize + trayFlowSpacing)) } else { local = trayList.mapFromGlobal(x, y); target = Math.round((local.x + trayList.contentX + trayCellSize / 2) / (trayCellSize + 4)) } target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); if (from >= 0 && target !== from) { dockTrayIcons.move(from, target); return target } return from }
+    function endTrayDrag() { trayDragWindow.close(); trayDragWindow.dragKey = "" }
+    function finishTrayDrag(key, x, y, dragged, from) { if (dragged && (pointInsideItem(trayOverflowButton, x, y) || pointInsideWindow(trayOverflowWindow, x, y))) { trayIcons.setOverflow(key, true); trayOverflowWindow.close() } endTrayDrag() }
     function schedulePreview(handle, item, title) { if (!previewsEnabled) return; previewHandle = handle; previewTitle = title; previewItem = item; previewCloseTimer.stop(); previewOpenTimer.restart() }
     function openPreview() { if (!previewItem) return; var point = previewItem.mapToGlobal(0, 0); var x = point.x + (previewItem.width - previewWindow.width) / 2; var y = point.y - previewWindow.height - 12; if (y < 8) y = point.y + previewItem.height + 12; previewWindow.x = Math.round(x); previewWindow.y = Math.round(y); previewWindow.show(); previewWindow.raise(); previewController.show(previewHandle, previewWindow, previewWindow.width, previewWindow.height) }
     function closePreview() { previewOpenTimer.stop(); previewCloseTimer.restart() }
@@ -113,6 +120,7 @@ Window {
     Timer { id: previewOpenTimer; interval: 280; onTriggered: root.openPreview() }
     Timer { id: previewCloseTimer; interval: 140; onTriggered: { previewController.hide(); previewWindow.hide() } }
     Timer { interval: 1000; running: true; repeat: true; onTriggered: { root.clock = Qt.formatTime(new Date(), root.clockFormat); root.date = Qt.formatDate(new Date(), "MMM d") } }
+    Timer { id: trayDrawerCloseTimer; interval: 220; onTriggered: trayOverflowWindow.close() }
     onPreviewsEnabledChanged: if (!previewsEnabled) root.closePreview()
     onClockFormatChanged: root.clock = Qt.formatTime(new Date(), root.clockFormat)
     onPreferredDockWidthChanged: if (!verticalDock && width !== preferredDockWidth) width = preferredDockWidth
@@ -350,6 +358,7 @@ Window {
                     property bool dragged: false
                     property real pressX: 0
                     property real pressY: 0
+                    property int dragIndex: -1
                     scale: trayMouse.containsMouse ? 1.12 : 1
                     Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                     Rectangle { anchors.centerIn: parent; width: root.trayCellSize; height: root.trayCellSize; radius: 7; color: root.iconSurfaceColor }
@@ -361,13 +370,13 @@ Window {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: true
                         preventStealing: true
-                        drag.target: trayItem
                         drag.axis: root.verticalDock ? Drag.YAxis : (root.trayWrapEnabled ? Drag.XAndYAxis : Drag.XAxis)
                         onEntered: trayIcons.activate(model.key, 3)
-                        onPressed: { if (mouse.button === Qt.RightButton) { trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false }
-                        onPositionChanged: if (Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5) trayItem.dragged = true
-                        onReleased: { if (mouse.button === Qt.RightButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && trayItem.dragged) { var overflowPoint = trayItem.mapToItem(trayOverflowButton, trayItem.width / 2, trayItem.height / 2); if (trayOverflowButton.visible && overflowPoint.x >= 0 && overflowPoint.x <= trayOverflowButton.width && overflowPoint.y >= 0 && overflowPoint.y <= trayOverflowButton.height) trayIcons.setOverflow(model.key, true); else { var position = root.verticalDock ? trayItem.y + trayList.contentY : (root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX); var flowWidth = root.verticalDock ? root.trayFlowWidth : root.trayFlowWidth - root.trayCellSize - root.trayFlowSpacing; var columns = Math.max(1, Math.floor((flowWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.verticalDock ? Math.round((position + trayItem.height / 2) / (trayItem.height + 4)) : (root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4))); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) } } }
-                        onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) } trayItem.dragged = false }
+                        onPressed: { if (mouse.button === Qt.RightButton) { trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; trayItem.dragIndex = index }
+                        onPositionChanged: { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); var moved = Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5; if (moved && !trayItem.dragged) { trayItem.dragged = true; root.beginTrayDrag(model.key, point.x, point.y) } if (trayItem.dragged) { root.updateTrayDrag(point.x, point.y); trayItem.dragIndex = root.reorderTrayItem(trayItem.dragIndex, point.x, point.y) } }
+                        onReleased: { if (mouse.button === Qt.RightButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); root.finishTrayDrag(model.key, point.x, point.y, trayItem.dragged, trayItem.dragIndex) } trayItem.dragged = false; trayItem.dragIndex = -1 }
+                        onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) } trayItem.dragged = false; trayItem.dragIndex = -1 }
+                        onCanceled: { root.endTrayDrag(); trayItem.dragged = false; trayItem.dragIndex = -1 }
                     }
                 }
             }
@@ -397,7 +406,8 @@ Window {
                         anchors.verticalCenter: !root.verticalDock && !root.trayWrapEnabled ? parent.verticalCenter : undefined
                         Rectangle { anchors.fill: parent; radius: 8; color: root.iconSurfaceColor; border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.08) }
                         Text { anchors.centerIn: parent; text: "⌃"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 13; font.bold: true }
-                        MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.togglePanel() }
+                        HoverHandler { onHoveredChanged: if (hovered) { trayDrawerCloseTimer.stop(); trayOverflowWindow.openPanel() } else trayDrawerCloseTimer.restart() }
+                        MouseArea { anchors.fill: parent; onClicked: { trayDrawerCloseTimer.stop(); trayOverflowWindow.togglePanel() } }
                     }
                     ListView {
                         id: trayList
@@ -419,6 +429,7 @@ Window {
                         delegate: trayDelegate
                     }
                     Flow {
+                        id: trayFlow
                         anchors.left: root.verticalDock ? parent.left : trayOverflowButton.right
                         anchors.right: parent.right
                         anchors.top: root.verticalDock ? trayOverflowButton.bottom : parent.top
@@ -807,8 +818,8 @@ Window {
         transientParent: root
         onActiveChanged: if (!active && visible) close()
 
-        function openPanel() { var point = trayOverflowButton.mapToGlobal(0, 0); var pointX = point.x + (trayOverflowButton.width - width) / 2; var pointY = point.y - height - 10; if (pointY < Screen.virtualY + 8) pointY = point.y + trayOverflowButton.height + 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); show(); raise(); requestActivate() }
-        function togglePanel() { if (visible) close(); else openPanel() }
+        function openPanel() { if (visible) { trayDrawerCloseTimer.stop(); return } var point = trayOverflowButton.mapToGlobal(0, 0); var pointX = point.x + (trayOverflowButton.width - width) / 2; var pointY = point.y - height - 10; if (pointY < Screen.virtualY + 8) pointY = point.y + trayOverflowButton.height + 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); show(); raise(); requestActivate() }
+        function togglePanel() { trayDrawerCloseTimer.stop(); if (visible) close(); else openPanel() }
 
         Rectangle {
             anchors.fill: parent
@@ -817,6 +828,7 @@ Window {
             color: root.surfaceColor
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, 0.08)
+            HoverHandler { onHoveredChanged: if (hovered) trayDrawerCloseTimer.stop(); else trayDrawerCloseTimer.restart() }
             Text { anchors.left: parent.left; anchors.leftMargin: 16; anchors.top: parent.top; anchors.topMargin: 10; text: "Tray"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 14; font.bold: true }
             Flow {
                 anchors.left: parent.left
@@ -837,25 +849,37 @@ Window {
                         property bool dragged: false
                         property real pressX: 0
                         property real pressY: 0
+                        property int dragIndex: -1
                         Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
                         Image { anchors.centerIn: parent; width: root.trayPixelSize; height: root.trayPixelSize; source: "image://tray/" + model.key; fillMode: Image.PreserveAspectFit; smooth: true }
                         MouseArea {
                             anchors.fill: parent
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
                             preventStealing: true
-                            drag.target: overflowItem
                             drag.axis: Drag.XAndYAxis
-                            onPressed: { overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false }
-                            onPositionChanged: if (pressed && (Math.abs(mouse.x - overflowItem.pressX) > 5 || Math.abs(mouse.y - overflowItem.pressY) > 5)) overflowItem.dragged = true
-                            onReleased: { if (mouse.button === Qt.RightButton) { var point = parent.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && overflowItem.dragged) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close() } }
-                            onDoubleClicked: if (mouse.button === Qt.LeftButton) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close() }
+                            onPressed: { if (mouse.button === Qt.RightButton) { overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false; return } overflowItem.pressX = mouse.x; overflowItem.pressY = mouse.y; overflowItem.dragged = false }
+                            onPositionChanged: { var point = parent.mapToGlobal(mouse.x, mouse.y); var moved = pressed && (Math.abs(mouse.x - overflowItem.pressX) > 5 || Math.abs(mouse.y - overflowItem.pressY) > 5); if (moved && !overflowItem.dragged) { overflowItem.dragged = true; root.beginTrayDrag(model.key, point.x, point.y) } if (overflowItem.dragged) root.updateTrayDrag(point.x, point.y) }
+                            onReleased: { if (mouse.button === Qt.RightButton) { var point = parent.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && overflowItem.dragged) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close() } root.endTrayDrag(); overflowItem.dragged = false; overflowItem.dragIndex = -1 }
+                            onDoubleClicked: if (mouse.button === Qt.LeftButton) { trayIcons.setOverflow(model.key, false); trayOverflowWindow.close(); root.endTrayDrag() }
                             onClicked: if (mouse.button === Qt.LeftButton && !overflowItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) }
-                            onCanceled: overflowItem.dragged = false
+                            onCanceled: { root.endTrayDrag(); overflowItem.dragged = false }
                         }
                     }
                 }
             }
         }
+    }
+
+    Window {
+        id: trayDragWindow
+        visible: false
+        property string dragKey: ""
+        width: root.trayCellSize
+        height: root.trayCellSize
+        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.Tool
+        color: "transparent"
+        transientParent: root
+        Image { anchors.centerIn: parent; width: root.trayPixelSize; height: root.trayPixelSize; source: dragKey.length > 0 ? "image://tray/" + dragKey : ""; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 0.96 }
     }
 
     Window {
