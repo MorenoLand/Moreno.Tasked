@@ -5,7 +5,7 @@ Window {
     id: root
     visible: false
     width: verticalDock ? 88 : preferredDockWidth
-    height: verticalDock ? preferredDockHeight : 88
+    height: verticalDock ? preferredDockHeight : 80
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
     title: "Tasked"
@@ -51,7 +51,7 @@ Window {
     property color surfaceBackgroundColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, surfaceColor.a * dockOpacity * backgroundOpacity)
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
     property color iconSurfaceColor: "transparent"
-    property int dockSectionHeight: 72
+    property int dockSectionHeight: 64
     property int dockSidePadding: 14
     property int buttonWidth: Math.max(60, iconSize + 18)
     property int visibleButtonCount: (startButtonEnabled ? 1 : 0) + (taskButtonEnabled ? 1 : 0) + (searchEnabled ? 1 : 0)
@@ -70,7 +70,7 @@ Window {
     property int trayWrapColumns: !verticalDock ? Math.max(1, Math.floor((trayWrapFlowWidth + trayFlowSpacing) / (trayCellSize + trayFlowSpacing))) : 1
     property int trayWrapRows: !verticalDock ? Math.max(1, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapColumns)) : Math.max(1, dockTrayIcons.count)
     property int trayFlowWidth: trayEnabled ? (verticalDock ? dockSectionHeight : (trayWrapEnabled ? trayWrapFlowWidth + trayCellSize + trayFlowSpacing : trayScrollEnabled ? 448 : unwrappedTrayWidth + trayCellSize + trayFlowSpacing)) : 0
-    property int trayContentHeight: trayEnabled ? (verticalDock ? trayCellSize + trayFlowSpacing + trayIconsHeight : (trayWrapEnabled ? trayWrapRows * trayCellSize + Math.max(0, trayWrapRows - 1) * trayFlowSpacing : 48)) : 0
+    property int trayContentHeight: trayEnabled ? (verticalDock ? trayCellSize + trayFlowSpacing + trayIconsHeight : (trayWrapEnabled ? trayWrapRows * trayCellSize + Math.max(0, trayWrapRows - 1) * trayFlowSpacing : 40)) : 0
     property bool clockSectionVisible: clockEnabled && (splitMode || !trayEnabled)
     property int clockSectionWidth: clockSectionVisible && !verticalDock ? clockWidth : 0
     property int rightWidth: trayEnabled ? (verticalDock ? dockSectionHeight : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
@@ -90,7 +90,7 @@ Window {
     property int splitClockOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - dockSectionHeight - leftHeight - middleHeight - (trayEnabled ? trayHeight : 0) - sectionGap * 3) : 0
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
-    property int iconTopMargin: labelsEnabled ? 11 : 18
+    property int iconTopMargin: labelsEnabled ? 4 : 8
     property int preferredDockWidth: splitSpreadMode && !verticalDock ? Math.max(1080, Screen.width - 32) : Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
     property int preferredDockHeight: splitSpreadMode && verticalDock ? Math.max(320, Screen.height - 32) : Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1))
     property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
@@ -301,8 +301,8 @@ Window {
                             Image { id: runningImage; anchors.fill: parent; anchors.margins: 6; source: model.iconSource; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
                             Text { anchors.centerIn: parent; text: model.title.charAt(0); color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: Math.max(17, Math.round(root.iconSize * 0.4)); font.bold: true; visible: runningImage.status !== Image.Ready }
                         }
-                        Rectangle { width: 6; height: 6; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: runningIcon.bottom; anchors.topMargin: 3; radius: 3; color: root.accentColor }
-                        Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 2; width: runningDelegate.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
+                        Rectangle { width: 5; height: 5; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: runningIcon.bottom; anchors.topMargin: 2; radius: 3; color: root.accentColor }
+                        Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 1; width: runningDelegate.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                         MouseArea {
                             id: runningMouse
                             anchors.fill: parent
