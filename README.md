@@ -27,12 +27,12 @@ Requirements:
 
 - MSVC 2022 x64
 - CMake and Ninja
-- Static Qt 6.8.3 installed at `D:/Qt/6.8.3-static-msvc2022_64`
+- Static Qt 6.8.3 for MSVC 2022 x64, with `QT_ROOT` set to its local install prefix
 
 From the project directory:
 
 ```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3-static-msvc2022_64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$env:QT_ROOT" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 cmake --build build --parallel
 ```
 
