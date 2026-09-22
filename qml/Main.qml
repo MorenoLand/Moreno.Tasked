@@ -421,6 +421,7 @@ Window {
                     id: trayContent
                     width: root.trayFlowWidth
                     height: root.trayContentHeight
+                    transform: Translate { y: root.trayWrapEnabled && !root.verticalDock ? Math.max(0, (root.trayHeight - height) / 2 - 2) : 0 }
                     Item {
                         id: trayOverflowButton
                         visible: root.trayEnabled
