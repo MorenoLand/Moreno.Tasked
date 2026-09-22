@@ -243,7 +243,37 @@ QImage trayIconImage(quintptr handle)
 {
     const auto copy = CopyIcon(reinterpret_cast<HICON>(handle));
     if (!copy) return {};
-    auto image = QImage::fromHICON(copy);
+    QImage image;
+    ICONINFO iconInfo{};
+    if (GetIconInfo(copy, &iconInfo)) {
+        BITMAP bitmap{};
+        if (iconInfo.hbmColor && GetObjectW(iconInfo.hbmColor, sizeof(bitmap), &bitmap) == sizeof(bitmap) && bitmap.bmWidth > 0 && bitmap.bmHeight > 0) {
+            const auto width = bitmap.bmWidth;
+            const auto height = bitmap.bmHeight;
+            image = QImage(width, height, QImage::Format_ARGB32);
+            BITMAPINFO bitmapInfo{};
+            bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            bitmapInfo.bmiHeader.biWidth = width;
+            bitmapInfo.bmiHeader.biHeight = -height;
+            bitmapInfo.bmiHeader.biPlanes = 1;
+            bitmapInfo.bmiHeader.biBitCount = 32;
+            bitmapInfo.bmiHeader.biCompression = BI_RGB;
+            const auto dc = GetDC(nullptr);
+            const auto colorRows = dc && GetDIBits(dc, iconInfo.hbmColor, 0, height, image.bits(), &bitmapInfo, DIB_RGB_COLORS) == height;
+            if (colorRows && iconInfo.hbmMask) {
+                bool hasAlpha = false;
+                for (int y = 0; y < height && !hasAlpha; ++y) for (int x = 0; x < width && !hasAlpha; ++x) hasAlpha = qAlpha(image.pixel(x, y)) != 0;
+                if (!hasAlpha) {
+                    QImage mask(width, height, QImage::Format_ARGB32);
+                    if (GetDIBits(dc, iconInfo.hbmMask, 0, height, mask.bits(), &bitmapInfo, DIB_RGB_COLORS) == height) for (int y = 0; y < height; ++y) for (int x = 0; x < width; ++x) image.setPixel(x, y, (image.pixel(x, y) & 0x00ffffff) | (qRed(mask.pixel(x, y)) == 255 ? 0 : 0xff000000));
+                }
+            } else if (!colorRows) image = {};
+            if (dc) ReleaseDC(nullptr, dc);
+        }
+        if (iconInfo.hbmMask) DeleteObject(iconInfo.hbmMask);
+        if (iconInfo.hbmColor) DeleteObject(iconInfo.hbmColor);
+    }
+    if (image.isNull()) image = QImage::fromHICON(copy);
     DestroyIcon(copy);
     return image;
 }
@@ -727,11 +757,18 @@ void TrayModel::refresh()
     }
     applySavedOrder(next);
     for (auto &item : next) {
-        if (item.icon) item.iconImage = trayIconImage(item.icon);
         const auto old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.key == item.key; });
-        if (old != items.cend() && item.icon == old->icon) {
+        if (old != items.cend()) {
+            if (!item.owner) { item.owner = old->owner; item.id = old->id; }
+            if (!item.callback) item.callback = old->callback;
+            if (!item.version) item.version = old->version;
+            if (!item.icon) item.icon = old->icon;
             if (item.image.isNull()) item.image = old->image;
             if (item.iconImage.isNull()) item.iconImage = old->iconImage;
+        }
+        if (item.icon) {
+            auto image = trayIconImage(item.icon);
+            if (!image.isNull()) item.iconImage = std::move(image);
         }
     }
     QHash<qulonglong, QImage> nextIconImages;

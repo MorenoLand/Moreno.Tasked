@@ -5,7 +5,7 @@ Window {
     id: root
     visible: false
     width: verticalDock ? 88 : preferredDockWidth
-    height: verticalDock ? preferredDockHeight : 80
+    height: verticalDock ? preferredDockHeight : horizontalDockHeight
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
     title: "Tasked"
@@ -94,6 +94,7 @@ Window {
     property int buttonIconTopMargin: iconTopMargin + (labelsEnabled ? 0 : 4)
     property int preferredDockWidth: splitSpreadMode && !verticalDock ? Math.max(1080, Screen.width - 32) : Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
     property int preferredDockHeight: splitSpreadMode && verticalDock ? Math.max(320, Screen.height - 32) : Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1))
+    property int horizontalDockHeight: Math.max(80, dock.implicitHeight + 8)
     property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
     property string clock: Qt.formatTime(new Date(), clockFormat)
     property string date: Qt.formatDate(new Date(), "MMM d")

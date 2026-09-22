@@ -26,6 +26,7 @@ QAbstractNativeEventFilter *eventFilter = nullptr;
 QVector<HWND> hiddenTaskbars;
 int dockHeight = 92;
 int dockPosition = 0;
+bool positioningDock = false;
 UINT taskbarCreatedMessage = 0;
 bool takeover = false;
 QTimer *startPositionTimer = nullptr;
@@ -483,14 +484,15 @@ public:
             positionDock();
             return false;
         }
-        if (reservation && msg->hwnd == nativeHandle(reservation) && msg->message == callbackMessage) positionDock();
+        if (reservation && msg->hwnd == nativeHandle(reservation) && msg->message == callbackMessage && msg->wParam == ABN_POSCHANGED) positionDock();
         return false;
     }
 };
 
 void positionDock()
 {
-    if (!reservation) return;
+    if (!reservation || positioningDock) return;
+    positioningDock = true;
     APPBARDATA data{};
     data.cbSize = sizeof(data);
     data.hWnd = nativeHandle(reservation);
@@ -509,13 +511,14 @@ void positionDock()
     else data.rc.left = data.rc.right - dockHeight;
     SHAppBarMessage(ABM_SETPOS, &data);
     reservation->setGeometry(data.rc.left, data.rc.top, data.rc.right - data.rc.left, data.rc.bottom - data.rc.top);
-    if (!visual) return;
+    if (!visual) { positioningDock = false; return; }
     const auto horizontal = dockPosition < 2;
     const auto maximumLength = (std::max)(320, (horizontal ? reservation->width() : reservation->height()) - 32);
     const auto currentLength = horizontal ? visual->width() : visual->height();
     const auto length = (std::min)(maximumLength, (std::max)(320, currentLength));
     if (horizontal) visual->setGeometry(data.rc.left + (reservation->width() - length) / 2, dockPosition == 1 ? data.rc.top : data.rc.bottom - visual->height(), length, visual->height());
     else visual->setGeometry(dockPosition == 2 ? data.rc.left : data.rc.right - visual->width(), data.rc.top + (reservation->height() - length) / 2, visual->width(), length);
+    positioningDock = false;
 }
 }
 
@@ -566,8 +569,8 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height, int posit
     SHAppBarMessage(ABM_NEW, &data);
     eventFilter = new DockEventFilter;
     qApp->installNativeEventFilter(eventFilter);
-    QObject::connect(visual, &QWindow::widthChanged, visual, [](int) { positionDock(); });
-    QObject::connect(visual, &QWindow::heightChanged, visual, [](int) { positionDock(); });
+    QObject::connect(visual, &QWindow::widthChanged, visual, [](int width) { if (dockPosition > 1) dockHeight = width; positionDock(); });
+    QObject::connect(visual, &QWindow::heightChanged, visual, [](int height) { if (dockPosition < 2) dockHeight = height; positionDock(); });
     fullscreenTimer = new QTimer(qApp);
     fullscreenTimer->setInterval(250);
     QObject::connect(fullscreenTimer, &QTimer::timeout, updateFullscreenVisibility);
@@ -579,6 +582,7 @@ QRect tasked::platform::installDock(QWindow *visualWindow, int height, int posit
 void tasked::platform::setDockPosition(int position)
 {
     dockPosition = (std::max)(0, (std::min)(3, position));
+    if (visual) dockHeight = dockPosition < 2 ? visual->height() : visual->width();
     positionDock();
 }
 
