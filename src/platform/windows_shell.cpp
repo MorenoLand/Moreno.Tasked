@@ -504,8 +504,15 @@ void RunningAppsModel::activate(const QString &windowHandle)
     const auto window = reinterpret_cast<HWND>(static_cast<quintptr>(value));
     if (ok && IsWindow(window)) {
         const auto foreground = GetForegroundWindow();
-        if (!IsIconic(window) && foreground == window) {
-            ShowWindowAsync(window, SW_MINIMIZE);
+        const auto foregroundRoot = foreground ? GetAncestor(foreground, GA_ROOT) : nullptr;
+        const auto targetRoot = GetAncestor(window, GA_ROOT);
+        const auto dock = FindWindowW(nullptr, L"Tasked");
+        const auto dockRoot = dock ? GetAncestor(dock, GA_ROOT) : nullptr;
+        const auto cachedActive = std::any_of(items.cbegin(), items.cend(), [window](const Item &item) { return item.window == static_cast<qulonglong>(reinterpret_cast<quintptr>(window)) && item.active; });
+        const auto foregroundTask = foreground == window || foregroundRoot == targetRoot;
+        const auto dockWasForeground = foreground == dock || foregroundRoot == dockRoot;
+        if (!IsIconic(window) && (foregroundTask || (dockWasForeground && cachedActive))) {
+            ShowWindow(window, SW_MINIMIZE);
             return;
         }
         const auto targetThread = GetWindowThreadProcessId(window, nullptr);

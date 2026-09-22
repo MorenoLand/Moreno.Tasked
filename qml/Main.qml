@@ -50,38 +50,44 @@ Window {
     property color sectionColor: theme === 1 ? "#E8124B5C" : theme === 2 ? "#E82B1D55" : "#E815244E"
     property color surfaceBackgroundColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, surfaceColor.a * dockOpacity * backgroundOpacity)
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
-    property color iconSurfaceColor: theme === 1 ? "#24526A" : theme === 2 ? "#4B3178" : "#31446F"
+    property color iconSurfaceColor: "transparent"
+    property int dockSectionHeight: 72
     property int dockSidePadding: 14
     property int buttonWidth: Math.max(60, iconSize + 18)
     property int visibleButtonCount: (startButtonEnabled ? 1 : 0) + (taskButtonEnabled ? 1 : 0) + (searchEnabled ? 1 : 0)
     property bool dividerOneVisible: dividersEnabled && startButtonEnabled && (taskButtonEnabled || searchEnabled)
     property bool dividerTwoVisible: dividersEnabled && taskButtonEnabled && searchEnabled
-    property int leftWidth: verticalDock ? (visibleButtonCount > 0 ? 76 : 0) : (visibleButtonCount > 0 ? buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2 : 0)
-    property int leftHeight: verticalDock ? (visibleButtonCount > 0 ? Math.max(76, visibleButtonCount * 76 + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) - 1) * 8 + dockSidePadding * 2) : 0) : 76
+    property int leftWidth: verticalDock ? (visibleButtonCount > 0 ? dockSectionHeight : 0) : (visibleButtonCount > 0 ? buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2 : 0)
+    property int leftHeight: verticalDock ? (visibleButtonCount > 0 ? Math.max(dockSectionHeight, visibleButtonCount * dockSectionHeight + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) - 1) * 8 + dockSidePadding * 2) : 0) : dockSectionHeight
     property int clockWidth: clockEnabled ? Math.max(clock24Hour ? (secondsEnabled ? 112 : 88) : (secondsEnabled ? 134 : 110), Math.round(clockSize * (secondsEnabled ? (clock24Hour ? 5.2 : 6.6) : (clock24Hour ? 3.8 : 5.2)) + 8)) : 0
     property int trayPixelSize: Math.max(12, Math.round(trayIconSize * trayScale))
     property int trayCellSize: trayPixelSize + 4
+    property int trayFlowSpacing: 3
     property int overflowButtonWidth: trayEnabled ? trayCellSize : 0
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * 4)
-    property int trayListHeight: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * 4)
+    property int trayIconsHeight: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * trayFlowSpacing)
+    property int trayWrapFlowWidth: Math.min(448, Math.max(2 * (trayCellSize + trayFlowSpacing) - trayFlowSpacing, Math.ceil(Math.max(1, dockTrayIcons.count) / 2) * (trayCellSize + trayFlowSpacing) - trayFlowSpacing))
+    property int trayWrapColumns: !verticalDock ? Math.max(1, Math.floor((trayWrapFlowWidth + trayFlowSpacing) / (trayCellSize + trayFlowSpacing))) : 1
+    property int trayWrapRows: !verticalDock ? Math.max(1, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapColumns)) : Math.max(1, dockTrayIcons.count)
+    property int trayFlowWidth: trayEnabled ? (verticalDock ? dockSectionHeight : (trayWrapEnabled ? trayWrapFlowWidth + trayCellSize + trayFlowSpacing : trayScrollEnabled ? 448 : unwrappedTrayWidth + trayCellSize + trayFlowSpacing)) : 0
+    property int trayContentHeight: trayEnabled ? (verticalDock ? trayCellSize + trayFlowSpacing + trayIconsHeight : (trayWrapEnabled ? trayWrapRows * trayCellSize + Math.max(0, trayWrapRows - 1) * trayFlowSpacing : 48)) : 0
     property bool clockSectionVisible: clockEnabled && (splitMode || !trayEnabled)
     property int clockSectionWidth: clockSectionVisible && !verticalDock ? clockWidth : 0
-    property int trayControlGaps: (overflowButtonWidth > 0 ? 1 : 0) + (!splitMode && clockEnabled ? 1 : 0)
-    property int rightWidth: trayEnabled ? (trayWrapEnabled || trayScrollEnabled ? 480 : Math.max(180, 32 + unwrappedTrayWidth + overflowButtonWidth + (splitMode ? 0 : clockWidth) + trayControlGaps * 12)) : 0
-    property int trayListWidth: trayEnabled ? (verticalDock ? 76 : (trayWrapEnabled || trayScrollEnabled ? Math.max(0, rightWidth - 32 - overflowButtonWidth - (splitMode ? 0 : clockWidth) - trayControlGaps * 12) : unwrappedTrayWidth)) : 0
-    property int trayHeight: verticalDock && trayEnabled ? Math.max(76, trayListHeight + dockSidePadding * 2 + (overflowButtonWidth > 0 ? trayCellSize + 12 : 0) + (!splitMode && clockEnabled ? 76 + 12 : 0)) : 76
+    property int rightWidth: trayEnabled ? (verticalDock ? dockSectionHeight : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
+    property int trayListWidth: trayEnabled ? trayFlowWidth : 0
+    property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : Math.max(dockSectionHeight, trayContentHeight + 24)) : 0
     property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
-    property int middleHeight: Math.max(320, runningList.count * 76 + 28)
+    property int middleHeight: Math.max(320, runningList.count * dockSectionHeight + 28)
     property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)
     property int horizontalContentWidth: leftWidth + middleWidth + rightWidth + clockSectionWidth
-    property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? 76 : 0)
+    property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? dockSectionHeight : 0)
     property bool splitSpreadMode: splitMode && spacedMode
     property int splitMiddleOffsetX: splitSpreadMode && !verticalDock ? Math.round((dock.width - middleWidth) / 2 - leftWidth - sectionGap) : 0
     property int splitTrayOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - rightWidth - leftWidth - middleWidth - sectionGap * 3) : 0
     property int splitClockOffsetX: splitSpreadMode && !verticalDock ? Math.round(dock.width - clockSectionWidth - leftWidth - middleWidth - rightWidth - sectionGap * 3) : 0
     property int splitMiddleOffsetY: splitSpreadMode && verticalDock ? Math.round((dock.height - middleHeight) / 2 - leftHeight - sectionGap) : 0
-    property int splitTrayOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - (clockSectionVisible ? 76 : 0) - (trayEnabled ? trayHeight : 0) - leftHeight - middleHeight - sectionGap * 3) : 0
-    property int splitClockOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - 76 - leftHeight - middleHeight - (trayEnabled ? trayHeight : 0) - sectionGap * 3) : 0
+    property int splitTrayOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - (clockSectionVisible ? dockSectionHeight : 0) - (trayEnabled ? trayHeight : 0) - leftHeight - middleHeight - sectionGap * 3) : 0
+    property int splitClockOffsetY: splitSpreadMode && verticalDock ? Math.round(dock.height - dockSectionHeight - leftHeight - middleHeight - (trayEnabled ? trayHeight : 0) - sectionGap * 3) : 0
     property int horizontalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 11 : 18
@@ -98,7 +104,7 @@ Window {
     function openTrayContextMenu(key) { trayContextKey = key; contextMenu.openMenu() }
     function showSystemTrayFlyout() { var point = trayPanel.mapToGlobal(0, 0); launcher.showSystemTrayFlyout(Math.round(point.x), Math.round(point.y), Math.round(trayPanel.width), Math.round(trayPanel.height)) }
     function showStartMenu() { var point = startButton.mapToGlobal(0, 0); launcher.showStartMenu(Math.round(point.x), Math.round(point.y), Math.round(startButton.width), Math.round(startButton.height)) }
-    function showRunDialog() { var point = root.startButtonEnabled ? startButton.mapToGlobal(0, 0) : dock.mapToGlobal(0, 0); var width = root.startButtonEnabled ? startButton.width : 76; var height = root.startButtonEnabled ? startButton.height : 76; launcher.showRunDialog(Math.round(point.x), Math.round(point.y), Math.round(width), Math.round(height)) }
+    function showRunDialog() { var point = root.startButtonEnabled ? startButton.mapToGlobal(0, 0) : dock.mapToGlobal(0, 0); var width = root.startButtonEnabled ? startButton.width : root.dockSectionHeight; var height = root.startButtonEnabled ? startButton.height : root.dockSectionHeight; launcher.showRunDialog(Math.round(point.x), Math.round(point.y), Math.round(width), Math.round(height)) }
     function schedulePreview(handle, item, title) { if (!previewsEnabled) return; previewHandle = handle; previewTitle = title; previewItem = item; previewCloseTimer.stop(); previewOpenTimer.restart() }
     function openPreview() { if (!previewItem) return; var point = previewItem.mapToGlobal(0, 0); var x = point.x + (previewItem.width - previewWindow.width) / 2; var y = point.y - previewWindow.height - 12; if (y < 8) y = point.y + previewItem.height + 12; previewWindow.x = Math.round(x); previewWindow.y = Math.round(y); previewWindow.show(); previewWindow.raise(); previewController.show(previewHandle, previewWindow, previewWindow.width, previewWindow.height) }
     function closePreview() { previewOpenTimer.stop(); previewCloseTimer.restart() }
@@ -143,8 +149,8 @@ Window {
 
         Rectangle {
             id: leftPanel
-            width: root.verticalDock ? 76 : root.leftWidth
-            height: root.verticalDock ? root.leftHeight : 76
+            width: root.verticalDock ? root.dockSectionHeight : root.leftWidth
+            height: root.verticalDock ? root.leftHeight : root.dockSectionHeight
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
@@ -168,8 +174,8 @@ Window {
                 spacing: 8
 
                 Item {
-                    width: root.verticalDock ? 76 : (root.startButtonEnabled ? root.buttonWidth : 0)
-                    height: 76
+                    width: root.verticalDock ? root.dockSectionHeight : (root.startButtonEnabled ? root.buttonWidth : 0)
+                    height: root.dockSectionHeight
                     visible: root.startButtonEnabled
                     Rectangle {
                         id: startButton
@@ -179,18 +185,9 @@ Window {
                         anchors.top: parent.top
                         anchors.topMargin: root.iconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
-                        color: root.accentColor
+                        color: "transparent"
                         scale: startMouse.containsMouse ? 1.1 : 1
                         Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: parent.radius
-                            gradient: Gradient {
-                                GradientStop { position: 0; color: Qt.lighter(root.accentColor, 1.3) }
-                                GradientStop { position: 1; color: Qt.darker(root.accentColor, 1.25) }
-                            }
-                            opacity: 0.72
-                        }
                         Grid {
                             anchors.centerIn: parent
                             columns: 2
@@ -205,8 +202,8 @@ Window {
                 Rectangle { width: root.dividerOneVisible ? (root.verticalDock ? 40 : 1) : 0; height: root.verticalDock ? 1 : 40; visible: root.dividerOneVisible; color: "#40FFFFFF" }
 
                 Item {
-                    width: root.verticalDock ? 76 : (root.taskButtonEnabled ? root.buttonWidth : 0)
-                    height: 76
+                    width: root.verticalDock ? root.dockSectionHeight : (root.taskButtonEnabled ? root.buttonWidth : 0)
+                    height: root.dockSectionHeight
                     visible: root.taskButtonEnabled
                     Rectangle {
                         id: taskButton
@@ -216,18 +213,9 @@ Window {
                         anchors.top: parent.top
                         anchors.topMargin: root.iconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
-                        color: root.accentColor
+                        color: "transparent"
                         scale: taskMouse.containsMouse ? 1.1 : 1
                         Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: parent.radius
-                            gradient: Gradient {
-                                GradientStop { position: 0; color: Qt.lighter(root.accentColor, 1.3) }
-                                GradientStop { position: 1; color: Qt.darker(root.accentColor, 1.25) }
-                            }
-                            opacity: 0.72
-                        }
                         Image { id: taskedImage; anchors.fill: parent; anchors.margins: 5; source: "qrc:/Tasked-icon.png"; fillMode: Image.PreserveAspectFit; smooth: true }
                         Text { anchors.centerIn: parent; text: "T"; color: "#FFFFFF"; font.family: root.fontFamily; font.pixelSize: Math.max(18, Math.round(root.iconSize * 0.5)); font.bold: true; visible: taskedImage.status !== Image.Ready }
                     }
@@ -238,8 +226,8 @@ Window {
                 Rectangle { width: root.dividerTwoVisible ? (root.verticalDock ? 40 : 1) : 0; height: root.verticalDock ? 1 : 40; visible: root.dividerTwoVisible; color: "#40FFFFFF" }
 
                 Item {
-                    width: root.verticalDock ? 76 : (root.searchEnabled ? root.buttonWidth : 0)
-                    height: 76
+                    width: root.verticalDock ? root.dockSectionHeight : (root.searchEnabled ? root.buttonWidth : 0)
+                    height: root.dockSectionHeight
                     visible: root.searchEnabled
                     Rectangle {
                         id: searchButton
@@ -263,8 +251,8 @@ Window {
 
         Rectangle {
             id: middlePanel
-            width: root.verticalDock ? 76 : root.middleWidth
-            height: root.verticalDock ? root.middleHeight : 76
+            width: root.verticalDock ? root.dockSectionHeight : root.middleWidth
+            height: root.verticalDock ? root.middleHeight : root.dockSectionHeight
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
@@ -294,8 +282,8 @@ Window {
                     displaced: Transition { NumberAnimation { properties: "x"; duration: root.fadeAnimationDuration; easing.type: Easing.InOutCubic } }
                     delegate: Item {
                         id: runningDelegate
-                        width: root.verticalDock ? 76 : root.buttonWidth
-                        height: 76
+                        width: root.verticalDock ? root.dockSectionHeight : root.buttonWidth
+                        height: root.dockSectionHeight
                         property bool dragged: false
                         Rectangle {
                             id: runningIcon
@@ -338,8 +326,8 @@ Window {
 
         Rectangle {
             id: trayPanel
-            width: root.trayEnabled ? (root.verticalDock ? 76 : root.rightWidth) : 0
-            height: root.trayEnabled ? (root.verticalDock ? root.trayHeight : 76) : 0
+            width: root.trayEnabled ? (root.verticalDock ? root.dockSectionHeight : root.rightWidth) : 0
+            height: root.trayEnabled ? root.trayHeight : 0
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
             opacity: 1
@@ -377,7 +365,7 @@ Window {
                         onEntered: trayIcons.activate(model.key, 3)
                         onPressed: { if (mouse.button === Qt.RightButton) { trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false; return } trayItem.pressX = mouse.x; trayItem.pressY = mouse.y; trayItem.dragged = false }
                         onPositionChanged: if (Math.abs(mouse.x - trayItem.pressX) > 5 || Math.abs(mouse.y - trayItem.pressY) > 5) trayItem.dragged = true
-                        onReleased: { if (mouse.button === Qt.RightButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && trayItem.dragged) { var overflowPoint = trayItem.mapToItem(trayOverflowButton, trayItem.width / 2, trayItem.height / 2); if (trayOverflowButton.visible && overflowPoint.x >= 0 && overflowPoint.x <= trayOverflowButton.width && overflowPoint.y >= 0 && overflowPoint.y <= trayOverflowButton.height) trayIcons.setOverflow(model.key, true); else { var position = root.verticalDock ? trayItem.y + trayList.contentY : (root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX); var columns = Math.max(1, Math.floor((root.trayListWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.verticalDock ? Math.round((position + trayItem.height / 2) / (trayItem.height + 4)) : (root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4))); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) } } }
+                        onReleased: { if (mouse.button === Qt.RightButton) { var point = trayMouse.mapToGlobal(mouse.x, mouse.y); trayIcons.showContextMenu(model.key, Math.round(point.x), Math.round(point.y)); return } if (mouse.button === Qt.LeftButton && trayItem.dragged) { var overflowPoint = trayItem.mapToItem(trayOverflowButton, trayItem.width / 2, trayItem.height / 2); if (trayOverflowButton.visible && overflowPoint.x >= 0 && overflowPoint.x <= trayOverflowButton.width && overflowPoint.y >= 0 && overflowPoint.y <= trayOverflowButton.height) trayIcons.setOverflow(model.key, true); else { var position = root.verticalDock ? trayItem.y + trayList.contentY : (root.trayWrapEnabled ? trayItem.x : trayItem.x + trayList.contentX); var flowWidth = root.verticalDock ? root.trayFlowWidth : root.trayFlowWidth - root.trayCellSize - root.trayFlowSpacing; var columns = Math.max(1, Math.floor((flowWidth + 3) / (trayItem.width + (root.trayWrapEnabled ? 3 : 4)))); var target = root.verticalDock ? Math.round((position + trayItem.height / 2) / (trayItem.height + 4)) : (root.trayWrapEnabled ? Math.round(trayItem.y / (trayItem.height + 3)) * columns + Math.round(position / (trayItem.width + 3)) : Math.round((position + trayItem.width / 2) / (trayItem.width + 4))); target = Math.max(0, Math.min(dockTrayIcons.count - 1, target)); dockTrayIcons.move(index, target) } } }
                         onClicked: { if (mouse.button === Qt.LeftButton && !trayItem.dragged) { if (trayIcons.isSystemFlyoutItem(model.key)) root.showSystemTrayFlyout(); else trayIcons.activate(model.key, 0) } trayItem.dragged = false }
                     }
                 }
@@ -386,26 +374,40 @@ Window {
             Grid {
                 id: trayGrid
                 anchors.fill: parent
-                anchors.leftMargin: root.verticalDock ? 0 : 16 + root.overflowButtonWidth + 12
+                anchors.leftMargin: root.verticalDock ? 0 : 16
                 anchors.rightMargin: root.verticalDock ? 0 : 16 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
                 anchors.topMargin: root.verticalDock ? root.dockSidePadding : 12
-                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + root.overflowButtonWidth + 12 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? 76 + 12 : 0) : 12
+                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.dockSectionHeight + 12 : 0) : 12
                 columns: 1
                 columnSpacing: root.verticalDock ? 0 : 12
                 rowSpacing: root.verticalDock ? 12 : 0
 
                 Item {
                     id: trayContent
-                    width: root.verticalDock ? 76 : root.trayListWidth
-                    height: root.verticalDock ? Math.max(52, root.trayListHeight) : 52
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: root.labelsEnabled ? 0 : 6
+                    width: root.trayFlowWidth
+                    height: root.trayContentHeight
+                    Item {
+                        id: trayOverflowButton
+                        visible: root.trayEnabled
+                width: root.verticalDock ? parent.width : root.trayCellSize
+                        height: root.trayCellSize
+                        anchors.left: root.verticalDock ? undefined : parent.left
+                        anchors.top: root.verticalDock || root.trayWrapEnabled ? parent.top : undefined
+                        anchors.verticalCenter: !root.verticalDock && !root.trayWrapEnabled ? parent.verticalCenter : undefined
+                        Rectangle { anchors.fill: parent; radius: 8; color: root.iconSurfaceColor; border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.08) }
+                        Text { anchors.centerIn: parent; text: "⌃"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 13; font.bold: true }
+                        MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.togglePanel() }
+                    }
                     ListView {
                         id: trayList
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: root.verticalDock ? 76 : root.trayListWidth
-                        height: root.verticalDock ? Math.max(1, root.trayListHeight) : 42
+                        anchors.left: root.verticalDock ? parent.left : trayOverflowButton.right
+                        anchors.right: parent.right
+                        anchors.top: root.verticalDock ? trayOverflowButton.bottom : undefined
+                        anchors.bottom: root.verticalDock ? parent.bottom : undefined
+                        anchors.leftMargin: root.trayFlowSpacing
+                        anchors.topMargin: root.verticalDock ? root.trayFlowSpacing : 0
+                        anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
+                        height: root.verticalDock ? Math.max(1, root.trayIconsHeight) : 42
                         visible: !root.trayWrapEnabled
                         clip: true
                         interactive: root.trayScrollEnabled
@@ -416,40 +418,25 @@ Window {
                         delegate: trayDelegate
                     }
                     Flow {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: root.verticalDock ? 76 : root.trayListWidth
-                        height: root.verticalDock ? Math.max(52, root.trayListHeight) : 52
+                        anchors.left: root.verticalDock ? parent.left : trayOverflowButton.right
+                        anchors.right: parent.right
+                        anchors.top: root.verticalDock ? trayOverflowButton.bottom : parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: root.trayFlowSpacing
+                        anchors.topMargin: root.verticalDock ? root.trayFlowSpacing : 0
                         visible: root.trayWrapEnabled
                         flow: root.verticalDock ? Flow.TopToBottom : Flow.LeftToRight
                         clip: true
-                        spacing: 3
+                        spacing: root.trayFlowSpacing
                         Repeater { model: dockTrayIcons; delegate: trayDelegate }
                     }
                 }
-
-            }
-            Item {
-                id: trayOverflowButton
-                visible: root.trayEnabled
-                width: visible ? (root.verticalDock ? 76 : root.overflowButtonWidth) : 0
-                height: visible ? root.trayCellSize : 0
-                anchors.left: root.verticalDock ? undefined : parent.left
-                anchors.leftMargin: root.verticalDock ? 0 : 8
-                anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
-                anchors.horizontalCenter: root.verticalDock ? parent.horizontalCenter : undefined
-                anchors.bottom: root.verticalDock ? (combinedClock.visible ? combinedClock.top : parent.bottom) : undefined
-                anchors.bottomMargin: root.verticalDock && combinedClock.visible ? 12 : 0
-                anchors.verticalCenterOffset: root.verticalDock ? 0 : (root.labelsEnabled ? 0 : 6)
-                Rectangle { anchors.fill: parent; radius: 7; color: root.iconSurfaceColor }
-                Text { anchors.centerIn: parent; text: "⌃"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
-                MouseArea { anchors.fill: parent; onClicked: trayOverflowWindow.togglePanel() }
             }
             Item {
                 id: combinedClock
                 visible: root.trayEnabled && !root.splitMode && root.clockEnabled
-                width: visible ? (root.verticalDock ? 76 : root.clockWidth) : 0
-                height: visible ? 76 : 0
+                width: visible ? (root.verticalDock ? root.dockSectionHeight : root.clockWidth) : 0
+                height: visible ? root.dockSectionHeight : 0
                 anchors.right: root.verticalDock ? undefined : parent.right
                 anchors.bottom: root.verticalDock ? parent.bottom : undefined
                 anchors.verticalCenter: root.verticalDock ? undefined : parent.verticalCenter
@@ -472,8 +459,8 @@ Window {
 
         Rectangle {
             id: clockPanel
-            width: root.clockSectionVisible ? (root.verticalDock ? 76 : root.clockSectionWidth) : 0
-            height: root.clockSectionVisible ? 76 : 0
+            width: root.clockSectionVisible ? (root.verticalDock ? root.dockSectionHeight : root.clockSectionWidth) : 0
+            height: root.clockSectionVisible ? root.dockSectionHeight : 0
             visible: root.clockSectionVisible
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.sectionBackgroundColor
