@@ -52,7 +52,7 @@ Window {
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
     property color iconSurfaceColor: "transparent"
     property int dockSectionHeight: 64
-    property int traySectionThickness: Math.max(48, dockSectionHeight - 8)
+    property int traySectionThickness: dockSectionHeight
     property int dockSidePadding: 14
     property int buttonWidth: Math.max(60, iconSize + 18)
     property int visibleButtonCount: (startButtonEnabled ? 1 : 0) + (taskButtonEnabled ? 1 : 0) + (searchEnabled ? 1 : 0)
@@ -67,7 +67,7 @@ Window {
     property int overflowButtonWidth: trayEnabled ? trayCellSize : 0
     property int unwrappedTrayWidth: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * 4)
     property int trayIconsHeight: Math.max(0, dockTrayIcons.count * trayCellSize + Math.max(0, dockTrayIcons.count - 1) * trayFlowSpacing)
-    property int trayWrapMaxRows: Math.max(1, Math.floor((traySectionThickness - 8 + trayFlowSpacing) / (trayCellSize + trayFlowSpacing)))
+    property int trayWrapMaxRows: Math.max(1, Math.floor((traySectionThickness - 4 + trayFlowSpacing) / (trayCellSize + trayFlowSpacing)))
     property int trayWrapFlowWidth: Math.max(2 * (trayCellSize + trayFlowSpacing) - trayFlowSpacing, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapMaxRows) * (trayCellSize + trayFlowSpacing) - trayFlowSpacing)
     property int trayWrapColumns: !verticalDock ? Math.max(1, Math.floor((trayWrapFlowWidth + trayFlowSpacing) / (trayCellSize + trayFlowSpacing))) : 1
     property int trayWrapRows: !verticalDock ? Math.max(1, Math.ceil(Math.max(1, dockTrayIcons.count) / trayWrapColumns)) : Math.max(1, dockTrayIcons.count)
@@ -411,8 +411,8 @@ Window {
                 anchors.fill: parent
                 anchors.leftMargin: root.verticalDock ? 0 : 16
                 anchors.rightMargin: root.verticalDock ? 0 : 16 + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.clockWidth + 12 : 0)
-                anchors.topMargin: root.verticalDock ? root.dockSidePadding : (root.trayWrapEnabled ? 4 : 8)
-                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.dockSectionHeight + 12 : 0) : (root.trayWrapEnabled ? 4 : 8)
+                anchors.topMargin: root.verticalDock ? root.dockSidePadding : (root.trayWrapEnabled ? 2 : 8)
+                anchors.bottomMargin: root.verticalDock ? root.dockSidePadding + (root.trayEnabled && !root.splitMode && root.clockEnabled ? root.dockSectionHeight + 12 : 0) : (root.trayWrapEnabled ? 2 : 8)
                 columns: 1
                 columnSpacing: root.verticalDock ? 0 : 12
                 rowSpacing: root.verticalDock ? 12 : 0
