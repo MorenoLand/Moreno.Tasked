@@ -15,8 +15,8 @@ class RunningAppsModel final : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    struct Item { qulonglong window = 0; QString title; QString iconSource; bool active = false; bool operator==(const Item &other) const { return window == other.window && title == other.title && iconSource == other.iconSource && active == other.active; } };
-    enum Role { TitleRole = Qt::UserRole + 1, WindowRole, IconSourceRole, ActiveRole };
+    struct Item { qulonglong window = 0; QString title; QString iconSource; bool active = false; QString appId; bool operator==(const Item &other) const { return window == other.window && title == other.title && iconSource == other.iconSource && active == other.active && appId == other.appId; } };
+    enum Role { TitleRole = Qt::UserRole + 1, WindowRole, IconSourceRole, ActiveRole, AppIdRole };
     explicit RunningAppsModel(QObject *parent = nullptr);
     ~RunningAppsModel() override;
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -27,6 +27,7 @@ public:
     Q_INVOKABLE void showTaskMenu(const QString &windowHandle, int x, int y);
     Q_INVOKABLE void close(const QString &windowHandle);
     Q_INVOKABLE void move(int from, int to);
+    bool isAppRunning(const QString &appId) const;
 private:
     void refresh();
     QVector<Item> items;
@@ -40,7 +41,7 @@ class PinnedAppsModel final : public QAbstractListModel
 public:
     struct Item { QString appId; QString title; QString iconSource; bool operator==(const Item &other) const { return appId == other.appId && title == other.title && iconSource == other.iconSource; } };
     enum Role { TitleRole = Qt::UserRole + 1, AppIdRole, IconSourceRole };
-    explicit PinnedAppsModel(QObject *parent = nullptr);
+    explicit PinnedAppsModel(RunningAppsModel *running, QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
@@ -51,6 +52,7 @@ signals:
     void countChanged();
 private:
     void refresh();
+    RunningAppsModel *running = nullptr;
     QVector<Item> items;
     QTimer timer;
 };

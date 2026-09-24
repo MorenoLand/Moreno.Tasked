@@ -43,7 +43,7 @@
 #include <utility>
 
 namespace {
-QHash<int, QByteArray> windowRoleNames() { return {{RunningAppsModel::TitleRole, "title"}, {RunningAppsModel::WindowRole, "windowHandle"}, {RunningAppsModel::IconSourceRole, "iconSource"}, {RunningAppsModel::ActiveRole, "active"}}; }
+QHash<int, QByteArray> windowRoleNames() { return {{RunningAppsModel::TitleRole, "title"}, {RunningAppsModel::WindowRole, "windowHandle"}, {RunningAppsModel::IconSourceRole, "iconSource"}, {RunningAppsModel::ActiveRole, "active"}, {RunningAppsModel::AppIdRole, "appId"}}; }
 QHash<int, QByteArray> trayRoleNames() { return {{TrayModel::KeyRole, "key"}, {TrayModel::TooltipRole, "tooltip"}}; }
 
 #ifdef Q_OS_WIN
@@ -550,23 +550,29 @@ QString pinnedShortcutIconSource(const QString &title)
     return {};
 }
 
-quintptr taskbarButtonForWindow(HWND window)
+const TaskbarButtonContext *taskbarButtonContextForWindow(HWND window)
 {
-    if (!window) return 0;
+    if (!window) return nullptr;
     std::array<wchar_t, 512> titleBuffer{};
     GetWindowTextW(window, titleBuffer.data(), static_cast<int>(titleBuffer.size()));
     const auto title = QString::fromWCharArray(titleBuffer.data()).trimmed();
     const auto processName = QFileInfo(processPath(window)).completeBaseName();
     const auto titleKey = normalizedTaskbarName(title);
     const auto processKey = normalizedTaskbarName(processName);
-    quintptr singleCandidate = 0;
+    const TaskbarButtonContext *singleCandidate = nullptr;
     for (const auto &button : taskbarButtonCache) {
-        if (!singleCandidate) singleCandidate = button.element;
+        if (!singleCandidate) singleCandidate = &button;
         const auto label = taskbarButtonLabel(button.name);
         const auto labelKey = normalizedTaskbarName(label);
-        if ((!titleKey.isEmpty() && (titleKey.contains(labelKey) || labelKey.contains(titleKey))) || (!processKey.isEmpty() && !labelKey.isEmpty() && (processKey.contains(labelKey) || labelKey.contains(processKey)))) return button.element;
+        if ((!titleKey.isEmpty() && (titleKey.contains(labelKey) || labelKey.contains(titleKey))) || (!processKey.isEmpty() && !labelKey.isEmpty() && (processKey.contains(labelKey) || labelKey.contains(processKey)))) return &button;
     }
-    return taskbarButtonCache.size() == 1 ? singleCandidate : 0;
+    return taskbarButtonCache.size() == 1 ? singleCandidate : nullptr;
+}
+
+quintptr taskbarButtonForWindow(HWND window)
+{
+    const auto button = taskbarButtonContextForWindow(window);
+    return button ? button->element : 0;
 }
 
 bool showTaskbarButtonContextMenu(HWND window)
@@ -861,7 +867,7 @@ RunningAppsModel::~RunningAppsModel()
 #endif
 }
 
-PinnedAppsModel::PinnedAppsModel(QObject *parent) : QAbstractListModel(parent)
+PinnedAppsModel::PinnedAppsModel(RunningAppsModel *running, QObject *parent) : QAbstractListModel(parent), running(running)
 {
     refresh();
     connect(&timer, &QTimer::timeout, this, &PinnedAppsModel::refresh);
@@ -887,7 +893,7 @@ void PinnedAppsModel::refresh()
 #ifdef Q_OS_WIN
     QVector<Item> next;
     for (const auto &button : taskbarButtonCache) {
-        if (!taskbarButtonIsPinned(button)) continue;
+        if (!taskbarButtonIsPinned(button) || (running && running->isAppRunning(button.automationId))) continue;
         const auto title = taskbarButtonLabel(button.name);
         next.append({ button.automationId, title, pinnedShortcutIconSource(title) });
     }
@@ -956,16 +962,25 @@ QVariant RunningAppsModel::data(const QModelIndex &index, int role) const
     if (role == WindowRole) return QString::number(item.window);
     if (role == IconSourceRole) return item.iconSource;
     if (role == ActiveRole) return item.active;
+    if (role == AppIdRole) return item.appId;
     return {};
 }
 
 QHash<int, QByteArray> RunningAppsModel::roleNames() const { return windowRoleNames(); }
+
+bool RunningAppsModel::isAppRunning(const QString &appId) const
+{
+    return !appId.isEmpty() && std::any_of(items.cbegin(), items.cend(), [&appId](const Item &item) { return item.appId == appId; });
+}
 
 void RunningAppsModel::refresh()
 {
 #ifdef Q_OS_WIN
     WindowRefreshContext context{ {}, GetForegroundWindow() };
     EnumWindows(enumerateWindows, reinterpret_cast<LPARAM>(&context));
+    for (auto &item : context.items) {
+        if (const auto *button = taskbarButtonContextForWindow(reinterpret_cast<HWND>(item.window))) item.appId = button->automationId;
+    }
     if (!items.isEmpty() && !context.items.isEmpty()) {
         QVector<Item> ordered;
         QSet<qulonglong> placed;

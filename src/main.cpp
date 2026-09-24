@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     ExtensionModel extensions;
     PreviewController previewController;
     RunningAppsModel runningApps;
-    PinnedAppsModel pinnedApps;
+    PinnedAppsModel pinnedApps(&runningApps);
     TrayModel trayIcons;
     TrayFilterModel dockTrayIcons(&trayIcons, false);
     TrayFilterModel overflowTrayIcons(&trayIcons, true);
