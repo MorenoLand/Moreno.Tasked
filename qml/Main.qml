@@ -54,10 +54,13 @@ Window {
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
     property color settingsTextColor: Qt.rgba(0.95, 0.97, 1.0, 0.96)
     property color settingsMutedColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.72)
-    property color settingsControlColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.18)
-    property color settingsControlStrongColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.30)
+    property color settingsControlColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.24)
+    property color settingsControlStrongColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.38)
     property color settingsBorderColor: Qt.rgba(1.0, 1.0, 1.0, 0.14)
-    property color settingsSurfaceColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, 0.96)
+    property color settingsSurfaceColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, 0.995)
+    property color contextMenuSurfaceColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, 0.96)
+    property color contextMenuControlColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.28)
+    property color contextMenuBorderColor: Qt.rgba(1.0, 1.0, 1.0, 0.18)
     property color iconSurfaceColor: "transparent"
     property int dockSectionHeight: 64
     property int traySectionThickness: dockSectionHeight
@@ -616,7 +619,7 @@ Window {
         id: settingsWindow
         visible: false
         width: 560
-        height: 500
+        height: 520
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
         transientParent: root
@@ -661,10 +664,12 @@ Window {
             opacity: 0
             scale: 0.96
             gradient: Gradient {
-                GradientStop { position: 0; color: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.34) }
+                GradientStop { position: 0; color: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.62) }
+                GradientStop { position: 0.18; color: root.settingsSurfaceColor }
                 GradientStop { position: 1; color: root.settingsSurfaceColor }
             }
             Behavior on scale { NumberAnimation { duration: root.animationDuration; easing.type: Easing.OutBack } }
+            Behavior on color { ColorAnimation { duration: root.shortAnimationDuration } }
 
             Rectangle { anchors.fill: parent; anchors.margins: -7; radius: 31; color: Qt.rgba(0.0, 0.0, 0.0, 0.32); z: -1 }
 
@@ -704,12 +709,14 @@ Window {
 
                 Item {
                     width: parent.width
-                    height: 315
+                    height: 335
                     clip: true
 
                     Item {
                         anchors.fill: parent
-                        visible: root.settingsTab === 0
+                        opacity: root.settingsTab === 0 ? 1 : 0
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: root.shortAnimationDuration } }
                         Column {
                             anchors.fill: parent
                             spacing: 10
@@ -768,18 +775,22 @@ Window {
                                 Text { width: 48; text: taskedSettings.cornerRadius + " px"; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter }
                                 Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "−"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setCornerRadius(taskedSettings.cornerRadius - 2) } }
                                 Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "+"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setCornerRadius(taskedSettings.cornerRadius + 2) } }
+                             }
+                             Row { width: parent.width; height: 30; Text { width: 110; text: "Icon size"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.iconSize + " px"; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "−"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setIconSize(taskedSettings.iconSize - 2) } } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "+"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setIconSize(taskedSettings.iconSize + 2) } }
                             }
                         }
                     }
 
                     Item {
                         anchors.fill: parent
-                        visible: root.settingsTab === 1
+                        opacity: root.settingsTab === 1 ? 1 : 0
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: root.shortAnimationDuration } }
                         Column {
                             anchors.fill: parent
                             spacing: 4
                             Text { text: "Dock layout"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
-                            Text { text: "Choose the surface and which controls occupy it."; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11 }
+                            Text { text: "Choose the surface, controls, and tray sizing."; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11 }
                             Row {
                                 width: parent.width
                                 height: 44
@@ -825,7 +836,9 @@ Window {
 
                     Item {
                         anchors.fill: parent
-                        visible: root.settingsTab === 2
+                        opacity: root.settingsTab === 2 ? 1 : 0
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: root.shortAnimationDuration } }
                         Column {
                             anchors.fill: parent
                             spacing: 12
@@ -845,22 +858,25 @@ Window {
 
                     Item {
                         anchors.fill: parent
-                        visible: root.settingsTab === 3
+                        opacity: root.settingsTab === 3 ? 1 : 0
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: root.shortAnimationDuration } }
                         Column {
                             anchors.fill: parent
                             spacing: 10
                             Text { text: "Typography"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 15; font.bold: true }
-                            Text { text: "Tune the dock typography and icon sizing."; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11 }
+                            Text { text: "Tune the dock typography and text sizing."; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11 }
                             Row { width: parent.width; height: 34; Text { width: 110; text: "Font family"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 210; height: 1 } Rectangle { width: 100; height: 30; radius: 9; color: root.accentColor; Text { anchors.centerIn: parent; text: taskedSettings.fontFamily; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 10; elide: Text.ElideRight } MouseArea { anchors.fill: parent; onClicked: { var choices = ["Segoe UI", "Arial", "Consolas"]; taskedSettings.setFontFamily(choices[(choices.indexOf(taskedSettings.fontFamily) + 1) % choices.length]) } } } }
                             Row { width: parent.width; height: 30; Text { width: 110; text: "Label size"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.labelSize + " px"; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "−"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelSize(taskedSettings.labelSize - 1) } } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "+"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setLabelSize(taskedSettings.labelSize + 1) } } }
                             Row { width: parent.width; height: 30; Text { width: 110; text: "Clock size"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.clockSize + " px"; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "−"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockSize(taskedSettings.clockSize - 1) } } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "+"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockSize(taskedSettings.clockSize + 1) } } }
-                            Row { width: parent.width; height: 30; Text { width: 110; text: "Icon size"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } Item { width: parent.width - 246; height: 1 } Text { width: 48; text: taskedSettings.iconSize + " px"; color: root.settingsMutedColor; font.family: root.fontFamily; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "−"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setIconSize(taskedSettings.iconSize - 2) } } Rectangle { width: 28; height: 28; radius: 8; color: root.settingsControlColor; Text { anchors.centerIn: parent; text: "+"; color: root.settingsTextColor; font.pixelSize: 16 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setIconSize(taskedSettings.iconSize + 2) } } }
-                                                                                }
+                                                                                                            }
                     }
 
                     Item {
                         anchors.fill: parent
-                        visible: root.settingsTab === 4
+                        opacity: root.settingsTab === 4 ? 1 : 0
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: root.shortAnimationDuration } }
                         Column {
                             anchors.fill: parent
                             spacing: 8
@@ -1039,17 +1055,44 @@ Window {
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
         transientParent: root
-        onActiveChanged: if (!active && visible) close()
+        onActiveChanged: if (!active && visible) closeMenu()
 
-        function openMenu(globalX, globalY) { var pointX = globalX === undefined ? root.x + (root.width - width) / 2 : globalX - width / 2; var pointY = root.dockPosition === 1 ? root.y + root.height + 10 : root.verticalDock ? (globalY === undefined ? root.y + (root.height - height) / 2 : globalY - height / 2) : root.y - height - 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); show(); raise(); requestActivate() }
+        function closeMenu() { if (visible) contextMenuCloseAnimation.restart() }
+
+        ParallelAnimation {
+            id: contextMenuOpenAnimation
+            NumberAnimation { target: contextMenuCard; property: "opacity"; to: 1; duration: root.fastAnimationDuration; easing.type: Easing.OutCubic }
+            NumberAnimation { target: contextMenuCard; property: "scale"; to: 1; duration: root.animationDuration; easing.type: Easing.OutBack }
+        }
+
+        SequentialAnimation {
+            id: contextMenuCloseAnimation
+            ParallelAnimation {
+                NumberAnimation { target: contextMenuCard; property: "opacity"; to: 0; duration: root.closeAnimationDuration; easing.type: Easing.InCubic }
+                NumberAnimation { target: contextMenuCard; property: "scale"; to: 0.96; duration: root.closeAnimationDuration; easing.type: Easing.InCubic }
+            }
+            ScriptAction { script: contextMenu.visible = false }
+        }
+
+        function openMenu(globalX, globalY) { var pointX = globalX === undefined ? root.x + (root.width - width) / 2 : globalX - width / 2; var pointY = root.dockPosition === 1 ? root.y + root.height + 10 : root.verticalDock ? (globalY === undefined ? root.y + (root.height - height) / 2 : globalY - height / 2) : root.y - height - 10; x = Math.round(Math.max(Screen.virtualX + 8, Math.min(pointX, Screen.virtualX + Screen.width - width - 8))); y = Math.round(Math.max(Screen.virtualY + 8, Math.min(pointY, Screen.virtualY + Screen.height - height - 8))); contextMenuCard.opacity = 0; contextMenuCard.scale = 0.96; show(); raise(); requestActivate(); contextMenuOpenAnimation.restart() }
 
         Rectangle {
+            id: contextMenuCard
             anchors.fill: parent
             anchors.margins: 5
             radius: 20
-            color: root.surfaceColor
+            color: root.contextMenuSurfaceColor
+            opacity: 0
+            scale: 0.96
+            transformOrigin: Item.Center
+            gradient: Gradient {
+                GradientStop { position: 0; color: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.55) }
+                GradientStop { position: 0.16; color: root.contextMenuSurfaceColor }
+                GradientStop { position: 1; color: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, 0.99) }
+            }
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.08)
+            border.color: root.contextMenuBorderColor
+            Behavior on color { ColorAnimation { duration: root.shortAnimationDuration } }
 
             Column {
                 anchors.fill: parent
@@ -1057,14 +1100,14 @@ Window {
                 spacing: 6
                 Item { width: parent.width; height: 30; Text { text: "Tasked"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 18; font.bold: true } Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Menu"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 11; font.bold: true } }
                 Rectangle { width: parent.width; height: 1; color: "#20FFFFFF" }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Settings"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { contextMenu.close(); root.settingsOpen = true } } }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Run"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { contextMenu.close(); root.showRunDialog() } } }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Seconds"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.secondsEnabled ? "On" : "Off"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSecondsEnabled(!taskedSettings.secondsEnabled) } }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Clock format"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.clock24Hour ? "24-hour" : "12-hour"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClock24Hour(!taskedSettings.clock24Hour) } }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Clock"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.clockEnabled ? "Shown" : "Hidden"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockEnabled(!taskedSettings.clockEnabled) } }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Tray wrapping"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.trayWrapEnabled ? "On" : "Off"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayWrapEnabled(!taskedSettings.trayWrapEnabled) } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Settings"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { contextMenu.closeMenu(); root.settingsOpen = true } } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Run"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { contextMenu.closeMenu(); root.showRunDialog() } } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Seconds"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.secondsEnabled ? "On" : "Off"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setSecondsEnabled(!taskedSettings.secondsEnabled) } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Clock format"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.clock24Hour ? "24-hour" : "12-hour"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClock24Hour(!taskedSettings.clock24Hour) } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Clock"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.clockEnabled ? "Shown" : "Hidden"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setClockEnabled(!taskedSettings.clockEnabled) } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Tray wrapping"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: taskedSettings.trayWrapEnabled ? "On" : "Off"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 10 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.setTrayWrapEnabled(!taskedSettings.trayWrapEnabled) } }
                 Rectangle { visible: root.trayContextKey.length > 0; width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: trayIcons.isOverflow(root.trayContextKey) ? "Show tray icon" : "Move to overflow"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: { trayIcons.setOverflow(root.trayContextKey, !trayIcons.isOverflow(root.trayContextKey)); root.trayContextKey = "" } } }
-                Rectangle { width: parent.width; height: 32; radius: 9; color: root.settingsControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Reset settings"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.reset() } }
+                Rectangle { width: parent.width; height: 32; radius: 9; color: root.contextMenuControlColor; Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "Reset settings"; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: 11 } MouseArea { anchors.fill: parent; onClicked: taskedSettings.reset() } }
                 Rectangle { width: parent.width; height: 32; radius: 9; color: "#42243A"; Text { anchors.centerIn: parent; text: "Exit Tasked"; color: "#FFD6E2"; font.family: root.fontFamily; font.pixelSize: 11; font.bold: true } MouseArea { anchors.fill: parent; onClicked: Qt.quit() } }
             }
         }
