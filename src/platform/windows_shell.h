@@ -57,6 +57,29 @@ private:
     QTimer timer;
 };
 
+class TaskbarAppsModel final : public QAbstractListModel
+{
+    Q_OBJECT
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+public:
+    struct Item { QString appId; QString title; QString iconSource; QString windowHandle; bool active = false; bool pinned = false; bool running = false; bool operator==(const Item &other) const { return appId == other.appId && title == other.title && iconSource == other.iconSource && windowHandle == other.windowHandle && active == other.active && pinned == other.pinned && running == other.running; } };
+    enum Role { TitleRole = Qt::UserRole + 1, WindowRole, IconSourceRole, ActiveRole, AppIdRole, PinnedRole, RunningRole };
+    explicit TaskbarAppsModel(RunningAppsModel *running, QObject *parent = nullptr);
+    int rowCount(const QModelIndex &parent = {}) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    QHash<int, QByteArray> roleNames() const override;
+    int count() const { return rowCount(); }
+    Q_INVOKABLE void launchPinned(const QString &appId);
+    Q_INVOKABLE void showPinnedTaskMenu(const QString &appId, int x, int y);
+signals:
+    void countChanged();
+private:
+    void refresh();
+    RunningAppsModel *running = nullptr;
+    QVector<Item> items;
+    QTimer timer;
+};
+
 class TrayModel final : public QAbstractListModel
 {
     Q_OBJECT

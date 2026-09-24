@@ -89,7 +89,7 @@ Window {
     property int rightWidth: trayEnabled ? (verticalDock ? traySectionThickness : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
     property int trayListWidth: trayEnabled ? trayFlowWidth : 0
     property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : traySectionThickness) : 0
-    property int taskItemCount: verticalDock ? runningList.count : pinnedApps.count + runningList.count
+    property int taskItemCount: runningList.count
     property int middleWidth: taskItemCount > 0 ? Math.max(dockSectionHeight, taskItemCount * (buttonWidth + 8) - 8 + 28) : 0
     property int middleHeight: taskItemCount > 0 ? Math.max(dockSectionHeight, taskItemCount * dockSectionHeight + (taskItemCount - 1) * 8 + 28) : 0
     property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)
@@ -359,8 +359,8 @@ Window {
 
                 ListView {
                     id: pinnedList
-                    visible: !root.verticalDock
-                    width: visible ? Math.max(0, pinnedApps.count * (root.buttonWidth + 8) - 8) : 0
+                    visible: false
+                    width: 0
                     height: parent.height
                     clip: true
                     interactive: false
@@ -404,14 +404,14 @@ Window {
 
                 ListView {
                     id: runningList
-                    width: root.verticalDock ? parent.width : Math.max(0, parent.width - pinnedList.width)
+                    width: parent.width
                     height: parent.height
                     clip: true
                     interactive: false
                     orientation: root.verticalDock ? ListView.Vertical : ListView.Horizontal
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8
-                    model: runningApps
+                    model: taskbarApps
                     add: Transition { NumberAnimation { properties: "x,opacity"; from: 16; to: 0; duration: root.animationDuration; easing.type: Easing.OutCubic } }
                     displaced: Transition { NumberAnimation { properties: "x"; duration: root.fadeAnimationDuration; easing.type: Easing.InOutCubic } }
                     delegate: Item {
@@ -443,7 +443,7 @@ Window {
                             Image { id: runningImage; anchors.fill: parent; anchors.margins: 6; source: model.iconSource; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
                             Text { anchors.centerIn: parent; text: model.title.charAt(0); color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: Math.max(17, Math.round(root.iconSize * 0.4)); font.bold: true; visible: runningImage.status !== Image.Ready }
                         }
-                        Rectangle { width: 5; height: 5; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: runningIcon.bottom; anchors.topMargin: 2; radius: 3; color: root.accentColor }
+                        Rectangle { visible: model.windowHandle !== "0"; width: 5; height: 5; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: runningIcon.bottom; anchors.topMargin: 2; radius: 3; color: root.accentColor }
                         Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 1; width: runningDelegate.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: root.labelSize }
                         MouseArea {
                             id: runningMouse
@@ -452,12 +452,12 @@ Window {
                             hoverEnabled: true
                             drag.axis: Drag.XAxis
                             property real pressX: 0
-                            onEntered: root.schedulePreview(model.windowHandle, runningDelegate, model.title)
-                            onExited: root.closePreview()
-                            onPressed: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); runningDelegate.dragPressed = false; pressX = mouse.x; runningDelegate.dragged = false; return } runningDelegate.wasActiveAtPress = model.active; root.dismissPreview(); runningDelegate.dragPressed = true; pressX = mouse.x; runningDelegate.dragged = false; runningDelegate.dragIndex = index }
-                            onPositionChanged: { if (!runningDelegate.dragPressed) return; var point = runningMouse.mapToGlobal(mouse.x, mouse.y); if (Math.abs(mouse.x - pressX) > 6 && !runningDelegate.dragged) { runningDelegate.dragged = true; root.beginTaskDrag(model.iconSource, model.title, runningDelegate.dragIndex, point.x, point.y) } if (runningDelegate.dragged) root.updateTaskDrag(point.x, point.y) }
-                            onReleased: { if (mouse.button === Qt.RightButton) { runningDelegate.dragPressed = false; root.dismissPreview(); var point = runningMouse.mapToGlobal(mouse.x, mouse.y); runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } runningDelegate.dragPressed = false; if (mouse.button === Qt.LeftButton && runningDelegate.dragged) root.endTaskDrag() }
-                            onClicked: { root.closePreview(); if (mouse.button === Qt.LeftButton && !runningDelegate.dragged) runningApps.activate(model.windowHandle, runningDelegate.wasActiveAtPress); runningDelegate.dragged = false; runningDelegate.dragIndex = -1 }
+                            onEntered: if (model.windowHandle !== "0") root.schedulePreview(model.windowHandle, runningDelegate, model.title); else root.closePreview()
+                            onExited: if (model.windowHandle !== "0") root.closePreview()
+                            onPressed: { if (mouse.button === Qt.RightButton) { root.dismissPreview(); runningDelegate.dragPressed = false; pressX = mouse.x; runningDelegate.dragged = false; return } if (model.windowHandle === "0") { runningDelegate.dragPressed = false; runningDelegate.dragged = false; return } runningDelegate.wasActiveAtPress = model.active; root.dismissPreview(); runningDelegate.dragPressed = true; pressX = mouse.x; runningDelegate.dragged = false; runningDelegate.dragIndex = index }
+                            onPositionChanged: { if (!runningDelegate.dragPressed || model.windowHandle === "0") return; var point = runningMouse.mapToGlobal(mouse.x, mouse.y); if (Math.abs(mouse.x - pressX) > 6 && !runningDelegate.dragged) { runningDelegate.dragged = true; root.beginTaskDrag(model.iconSource, model.title, runningDelegate.dragIndex, point.x, point.y) } if (runningDelegate.dragged) root.updateTaskDrag(point.x, point.y) }
+                            onReleased: { if (mouse.button === Qt.RightButton) { runningDelegate.dragPressed = false; root.dismissPreview(); var point = runningMouse.mapToGlobal(mouse.x, mouse.y); if (model.windowHandle === "0") taskbarApps.showPinnedTaskMenu(model.appId, Math.round(point.x), Math.round(point.y)); else runningApps.showTaskMenu(model.windowHandle, Math.round(point.x), Math.round(point.y)); return } runningDelegate.dragPressed = false; if (mouse.button === Qt.LeftButton && runningDelegate.dragged) root.endTaskDrag() }
+                            onClicked: { root.closePreview(); if (mouse.button === Qt.LeftButton && !runningDelegate.dragged) { if (model.windowHandle === "0") taskbarApps.launchPinned(model.appId); else runningApps.activate(model.windowHandle, runningDelegate.wasActiveAtPress) } runningDelegate.dragged = false; runningDelegate.dragIndex = -1 }
                             onCanceled: { runningDelegate.dragPressed = false; root.endTaskDrag(); runningDelegate.dragged = false; runningDelegate.dragIndex = -1 }
                         }
                     }

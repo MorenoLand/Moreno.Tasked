@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
     PreviewController previewController;
     RunningAppsModel runningApps;
     PinnedAppsModel pinnedApps(&runningApps);
+    TaskbarAppsModel taskbarApps(&runningApps);
     TrayModel trayIcons;
     TrayFilterModel dockTrayIcons(&trayIcons, false);
     TrayFilterModel overflowTrayIcons(&trayIcons, true);
@@ -48,6 +49,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("previewController", &previewController);
     engine.rootContext()->setContextProperty("runningApps", &runningApps);
     engine.rootContext()->setContextProperty("pinnedApps", &pinnedApps);
+    engine.rootContext()->setContextProperty("taskbarApps", &taskbarApps);
     engine.rootContext()->setContextProperty("trayIcons", &trayIcons);
     engine.rootContext()->setContextProperty("dockTrayIcons", &dockTrayIcons);
     engine.rootContext()->setContextProperty("overflowTrayIcons", &overflowTrayIcons);

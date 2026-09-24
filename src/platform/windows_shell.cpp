@@ -1099,6 +1099,121 @@ void RunningAppsModel::close(const QString &windowHandle)
 #endif
 }
 
+TaskbarAppsModel::TaskbarAppsModel(RunningAppsModel *runningApps, QObject *parent) : QAbstractListModel(parent), running(runningApps)
+{
+    connect(running, &QAbstractItemModel::modelReset, this, &TaskbarAppsModel::refresh);
+    connect(running, &QAbstractItemModel::dataChanged, this, &TaskbarAppsModel::refresh);
+    refresh();
+    connect(&timer, &QTimer::timeout, this, &TaskbarAppsModel::refresh);
+    timer.start(500);
+}
+
+int TaskbarAppsModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : items.size(); }
+
+QVariant TaskbarAppsModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() >= items.size()) return {};
+    const auto &item = items.at(index.row());
+    if (role == TitleRole) return item.title;
+    if (role == WindowRole) return item.windowHandle;
+    if (role == IconSourceRole) return item.iconSource;
+    if (role == ActiveRole) return item.active;
+    if (role == AppIdRole) return item.appId;
+    if (role == PinnedRole) return item.pinned;
+    if (role == RunningRole) return item.running;
+    return {};
+}
+
+QHash<int, QByteArray> TaskbarAppsModel::roleNames() const { return {{TitleRole, "title"}, {WindowRole, "windowHandle"}, {IconSourceRole, "iconSource"}, {ActiveRole, "active"}, {AppIdRole, "appId"}, {PinnedRole, "pinned"}, {RunningRole, "running"}}; }
+
+void TaskbarAppsModel::refresh()
+{
+#ifdef Q_OS_WIN
+    struct RunningEntry { QString appId; QString title; QString iconSource; QString windowHandle; bool active = false; };
+    QVector<RunningEntry> runningEntries;
+    for (int row = 0; row < running->rowCount(); ++row) {
+        const auto index = running->index(row, 0);
+        runningEntries.append({ running->data(index, RunningAppsModel::AppIdRole).toString(), running->data(index, RunningAppsModel::TitleRole).toString(), running->data(index, RunningAppsModel::IconSourceRole).toString(), running->data(index, RunningAppsModel::WindowRole).toString(), running->data(index, RunningAppsModel::ActiveRole).toBool() });
+    }
+    QVector<Item> next;
+    QSet<int> used;
+    for (const auto &button : taskbarButtonCache) {
+        if (button.automationId.isEmpty()) continue;
+        auto match = -1;
+        for (int index = 0; index < runningEntries.size(); ++index) {
+            if (used.contains(index)) continue;
+            const auto &entry = runningEntries.at(index);
+            if ((!entry.appId.isEmpty() && entry.appId == button.automationId) || normalizedTaskbarName(entry.title) == normalizedTaskbarName(taskbarButtonLabel(button.name))) { match = index; if (entry.active) break; }
+        }
+        const auto title = taskbarButtonLabel(button.name);
+        if (match >= 0) {
+            const auto &entry = runningEntries.at(match);
+            used.insert(match);
+            next.append({ button.automationId, title, entry.iconSource, entry.windowHandle, entry.active, taskbarButtonIsPinned(button), true });
+        } else if (taskbarButtonIsPinned(button)) {
+            next.append({ button.automationId, title, pinnedShortcutIconSource(title), QStringLiteral("0"), false, true, false });
+        }
+    }
+    for (int index = 0; index < runningEntries.size(); ++index) {
+        if (used.contains(index)) continue;
+        const auto &entry = runningEntries.at(index);
+        next.append({ entry.appId, entry.title, entry.iconSource, entry.windowHandle, entry.active, false, true });
+    }
+    if (next == items) return;
+    const auto oldCount = items.size();
+    beginResetModel();
+    items = std::move(next);
+    endResetModel();
+    if (oldCount != items.size()) emit countChanged();
+#endif
+}
+
+void TaskbarAppsModel::launchPinned(const QString &appId)
+{
+#ifdef Q_OS_WIN
+    auto element = taskbarButtonForAppId(appId);
+    if (element && invokeAutomationItem(element->element)) return;
+    const auto shell = realTrayWindow();
+    if (!shell) return;
+    const auto wasHidden = !IsWindowVisible(shell);
+    if (wasHidden) { ShowWindow(shell, SW_SHOWNOACTIVATE); Sleep(100); }
+    cacheTaskbarButtons();
+    const auto cached = taskbarButtonForAppId(appId);
+    if (cached) invokeAutomationItem(cached->element);
+    if (wasHidden && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
+#else
+    Q_UNUSED(appId);
+#endif
+}
+
+void TaskbarAppsModel::showPinnedTaskMenu(const QString &appId, int x, int y)
+{
+#ifdef Q_OS_WIN
+    const auto before = visibleWindows();
+    auto element = taskbarButtonForAppId(appId);
+    if (element && invokeAutomationContextMenu(element->element)) {
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            const auto popup = findContextPopup(before);
+            if (popup) { positionContextPopup(popup, POINT{ x, y }); break; }
+            Sleep(10);
+        }
+        return;
+    }
+    const auto shell = realTrayWindow();
+    if (!shell) return;
+    const auto wasHidden = !IsWindowVisible(shell);
+    if (wasHidden) { ShowWindow(shell, SW_SHOWNOACTIVATE); Sleep(120); }
+    cacheTaskbarButtons();
+    const auto cached = taskbarButtonForAppId(appId);
+    if (cached) invokeAutomationContextMenu(cached->element);
+    if (wasHidden && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
+#else
+    Q_UNUSED(appId);
+    Q_UNUSED(x);
+    Q_UNUSED(y);
+#endif
+}
+
 TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
 {
 #ifdef Q_OS_WIN
