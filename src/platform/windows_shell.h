@@ -33,6 +33,28 @@ private:
     QTimer timer;
 };
 
+class PinnedAppsModel final : public QAbstractListModel
+{
+    Q_OBJECT
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+public:
+    struct Item { QString appId; QString title; QString iconSource; bool operator==(const Item &other) const { return appId == other.appId && title == other.title && iconSource == other.iconSource; } };
+    enum Role { TitleRole = Qt::UserRole + 1, AppIdRole, IconSourceRole };
+    explicit PinnedAppsModel(QObject *parent = nullptr);
+    int rowCount(const QModelIndex &parent = {}) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    QHash<int, QByteArray> roleNames() const override;
+    int count() const { return rowCount(); }
+    Q_INVOKABLE void launch(const QString &appId);
+    Q_INVOKABLE void showContextMenu(const QString &appId, int x, int y);
+signals:
+    void countChanged();
+private:
+    void refresh();
+    QVector<Item> items;
+    QTimer timer;
+};
+
 class TrayModel final : public QAbstractListModel
 {
     Q_OBJECT

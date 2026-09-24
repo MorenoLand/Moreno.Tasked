@@ -89,8 +89,9 @@ Window {
     property int rightWidth: trayEnabled ? (verticalDock ? traySectionThickness : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
     property int trayListWidth: trayEnabled ? trayFlowWidth : 0
     property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : traySectionThickness) : 0
-    property int middleWidth: runningList.count > 0 ? Math.max(dockSectionHeight, runningList.count * (buttonWidth + 8) - 8 + 28) : 0
-    property int middleHeight: runningList.count > 0 ? Math.max(dockSectionHeight, runningList.count * dockSectionHeight + (runningList.count - 1) * 8 + 28) : 0
+    property int taskItemCount: verticalDock ? runningList.count : pinnedApps.count + runningList.count
+    property int middleWidth: taskItemCount > 0 ? Math.max(dockSectionHeight, taskItemCount * (buttonWidth + 8) - 8 + 28) : 0
+    property int middleHeight: taskItemCount > 0 ? Math.max(dockSectionHeight, taskItemCount * dockSectionHeight + (taskItemCount - 1) * 8 + 28) : 0
     property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)
     property int horizontalContentWidth: leftWidth + middleWidth + rightWidth + clockSectionWidth
     property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? dockSectionHeight : 0)
@@ -336,8 +337,8 @@ Window {
             height: root.verticalDock ? root.middleHeight : root.dockSectionHeight
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
-            opacity: runningList.count > 0 ? 1 : 0
-            visible: opacity > 0.01 || runningList.count > 0
+            opacity: taskItemCount > 0 ? 1 : 0
+            visible: opacity > 0.01 || taskItemCount > 0
             layer.enabled: root.shadowStyle > 0 && root.splitMode
             layer.effect: MultiEffect { shadowEnabled: true; shadowColor: "#000000"; shadowOpacity: root.shadowStyle === 1 ? 0.34 : 0.48; shadowBlur: root.shadowStyle === 1 ? 0.78 : 0.62; shadowHorizontalOffset: root.shadowStyle === 1 ? 0 : 4; shadowVerticalOffset: root.shadowStyle === 1 ? 1 : 6; blurMax: 10 }
             Loader { anchors.fill: parent; property real glassRadius: parent.radius; active: root.splitMode; sourceComponent: liquidGlassOverlay }
@@ -357,8 +358,53 @@ Window {
                 spacing: 10
 
                 ListView {
+                    id: pinnedList
+                    visible: !root.verticalDock
+                    width: visible ? Math.max(0, pinnedApps.count * (root.buttonWidth + 8) - 8) : 0
+                    height: parent.height
+                    clip: true
+                    interactive: false
+                    orientation: ListView.Horizontal
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
+                    model: pinnedApps
+                    add: Transition { NumberAnimation { properties: "x,opacity"; from: 12; to: 0; duration: root.animationDuration; easing.type: Easing.OutCubic } }
+                    delegate: Item {
+                        id: pinnedDelegate
+                        width: root.buttonWidth
+                        height: root.dockSectionHeight
+                        Rectangle {
+                            id: pinnedIcon
+                            width: root.iconSize
+                            height: root.iconSize
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.top: parent.top
+                            anchors.topMargin: root.iconTopMargin
+                            radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
+                            color: pinnedMouse.containsMouse ? Qt.rgba(0.35, 0.48, 0.80, 0.22) : Qt.rgba(0.16, 0.25, 0.45, 0.12)
+                            border.width: 1
+                            border.color: pinnedMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(1, 1, 1, 0.07)
+                            scale: pinnedMouse.containsMouse ? 1.1 : 1
+                            Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
+                            Image { id: pinnedImage; anchors.fill: parent; anchors.margins: 6; source: model.iconSource; fillMode: Image.PreserveAspectFit; smooth: true; visible: status === Image.Ready }
+                            Text { anchors.centerIn: parent; text: model.title.charAt(0); color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: Math.max(17, Math.round(root.iconSize * 0.4)); font.bold: true; visible: pinnedImage.status !== Image.Ready }
+                        }
+                        Rectangle { width: 5; height: 5; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: pinnedIcon.bottom; anchors.topMargin: 2; radius: 3; color: root.accentColor }
+                        Text { visible: root.labelsEnabled; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 1; width: parent.width; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; text: model.title; color: root.settingsTextColor; font.family: root.fontFamily; font.pixelSize: root.labelSize }
+                        MouseArea {
+                            id: pinnedMouse
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            hoverEnabled: true
+                            onClicked: if (mouse.button === Qt.LeftButton) pinnedApps.launch(model.appId)
+                            onReleased: if (mouse.button === Qt.RightButton) pinnedApps.showContextMenu(model.appId, Math.round(pinnedMouse.mapToGlobal(mouse.x, mouse.y).x), Math.round(pinnedMouse.mapToGlobal(mouse.x, mouse.y).y))
+                        }
+                    }
+                }
+
+                ListView {
                     id: runningList
-                    width: parent.width
+                    width: root.verticalDock ? parent.width : Math.max(0, parent.width - pinnedList.width)
                     height: parent.height
                     clip: true
                     interactive: false
