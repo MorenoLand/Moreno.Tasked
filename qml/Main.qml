@@ -89,8 +89,8 @@ Window {
     property int rightWidth: trayEnabled ? (verticalDock ? traySectionThickness : 32 + trayFlowWidth + (!splitMode && clockEnabled ? clockWidth + 12 : 0)) : 0
     property int trayListWidth: trayEnabled ? trayFlowWidth : 0
     property int trayHeight: trayEnabled ? (verticalDock ? Math.max(dockSectionHeight, trayContentHeight + dockSidePadding * 2 + (!splitMode && clockEnabled ? dockSectionHeight + 12 : 0)) : traySectionThickness) : 0
-    property int middleWidth: Math.max(320, runningList.count * (buttonWidth + 8) - 8 + 28)
-    property int middleHeight: Math.max(320, runningList.count * dockSectionHeight + 28)
+    property int middleWidth: runningList.count > 0 ? Math.max(dockSectionHeight, runningList.count * (buttonWidth + 8) - 8 + 28) : 0
+    property int middleHeight: runningList.count > 0 ? Math.max(dockSectionHeight, runningList.count * dockSectionHeight + (runningList.count - 1) * 8 + 28) : 0
     property int sectionGap: splitMode ? 10 : (spacedMode ? 10 : 0)
     property int horizontalContentWidth: leftWidth + middleWidth + rightWidth + clockSectionWidth
     property int verticalContentHeight: leftHeight + middleHeight + (trayEnabled ? trayHeight : 0) + (clockSectionVisible ? dockSectionHeight : 0)
@@ -105,8 +105,8 @@ Window {
     property int verticalSectionCount: (visibleButtonCount > 0 ? 1 : 0) + 1 + (trayEnabled ? 1 : 0) + (clockSectionVisible ? 1 : 0)
     property int iconTopMargin: labelsEnabled ? 4 : 8
     property int buttonIconTopMargin: iconTopMargin + (labelsEnabled ? 0 : 4)
-    property int preferredDockWidth: splitSpreadMode && !verticalDock ? Math.max(1080, Screen.width - 32) : Math.max(1080, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
-    property int preferredDockHeight: splitSpreadMode && verticalDock ? Math.max(320, Screen.height - 32) : Math.max(320, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1))
+    property int preferredDockWidth: splitSpreadMode && !verticalDock ? Math.max(1080, Screen.width - 32) : Math.max(320, horizontalContentWidth + sectionGap * Math.max(0, horizontalSectionCount - 1))
+    property int preferredDockHeight: splitSpreadMode && verticalDock ? Math.max(320, Screen.height - 32) : Math.max(160, verticalContentHeight + sectionGap * Math.max(0, verticalSectionCount - 1))
     property int horizontalDockHeight: Math.max(80, dock.implicitHeight + 8)
     property string clockFormat: clock24Hour ? (secondsEnabled ? "HH:mm:ss" : "HH:mm") : (secondsEnabled ? "h:mm:ss AP" : "h:mm AP")
     property string clock: Qt.formatTime(new Date(), clockFormat)
@@ -336,7 +336,8 @@ Window {
             height: root.verticalDock ? root.middleHeight : root.dockSectionHeight
             radius: root.splitMode ? root.cornerRadius : 0
             color: root.splitMode ? root.sectionBackgroundColor : "transparent"
-            opacity: 1
+            opacity: runningList.count > 0 ? 1 : 0
+            visible: opacity > 0.01 || runningList.count > 0
             layer.enabled: root.shadowStyle > 0 && root.splitMode
             layer.effect: MultiEffect { shadowEnabled: true; shadowColor: "#000000"; shadowOpacity: root.shadowStyle === 1 ? 0.34 : 0.48; shadowBlur: root.shadowStyle === 1 ? 0.78 : 0.62; shadowHorizontalOffset: root.shadowStyle === 1 ? 0 : 4; shadowVerticalOffset: root.shadowStyle === 1 ? 1 : 6; blurMax: 10 }
             Loader { anchors.fill: parent; property real glassRadius: parent.radius; active: root.splitMode; sourceComponent: liquidGlassOverlay }
@@ -345,7 +346,9 @@ Window {
             transform: Translate { x: root.splitMiddleOffsetX + (root.dockLocked ? 0 : middlePanel.freeX); y: root.splitMiddleOffsetY + (root.dockLocked ? 0 : middlePanel.freeY) }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
-            Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
+            Behavior on width { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+            Behavior on height { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+            Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration; easing.type: Easing.InOutCubic } }
 
             Row {
                 anchors.fill: parent

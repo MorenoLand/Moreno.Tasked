@@ -18,6 +18,7 @@ public:
     struct Item { qulonglong window = 0; QString title; QString iconSource; bool active = false; bool operator==(const Item &other) const { return window == other.window && title == other.title && iconSource == other.iconSource && active == other.active; } };
     enum Role { TitleRole = Qt::UserRole + 1, WindowRole, IconSourceRole, ActiveRole };
     explicit RunningAppsModel(QObject *parent = nullptr);
+    ~RunningAppsModel() override;
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;

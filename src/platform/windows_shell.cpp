@@ -452,6 +452,105 @@ bool invokeAutomationContextMenu(quintptr elementPointer)
     return result;
 }
 
+struct TaskbarButtonContext { QString name; QString automationId; quintptr element = 0; };
+QVector<TaskbarButtonContext> taskbarButtonCache;
+
+void releaseTaskbarButtonCache()
+{
+    for (auto &button : taskbarButtonCache) if (button.element) reinterpret_cast<IUIAutomationElement *>(button.element)->Release();
+    taskbarButtonCache.clear();
+}
+
+QString normalizedTaskbarName(QString value)
+{
+    value = value.toLower();
+    value.remove(QStringLiteral(".exe"));
+    value.remove(QStringLiteral("windows"));
+    value.remove(QLatin1Char(' '));
+    value.remove(QLatin1Char('-'));
+    value.remove(QLatin1Char('_'));
+    return value;
+}
+
+QString taskbarButtonLabel(const QString &name)
+{
+    const auto separator = name.indexOf(QStringLiteral(" - "));
+    return (separator < 0 ? name : name.left(separator)).trimmed();
+}
+
+void cacheTaskbarButtons()
+{
+    auto *uiAutomation = automation();
+    const auto shell = realTrayWindow();
+    if (!uiAutomation || !shell || !IsWindowVisible(shell)) return;
+    IUIAutomationElement *root = nullptr;
+    if (FAILED(uiAutomation->ElementFromHandle(shell, &root)) || !root) return;
+    VARIANT value{};
+    value.vt = VT_I4;
+    value.lVal = UIA_ButtonControlTypeId;
+    IUIAutomationCondition *condition = nullptr;
+    IUIAutomationElementArray *elements = nullptr;
+    if (FAILED(uiAutomation->CreatePropertyCondition(UIA_ControlTypePropertyId, value, &condition)) || !condition || FAILED(root->FindAll(TreeScope_Descendants, condition, &elements)) || !elements) {
+        if (condition) condition->Release();
+        root->Release();
+        return;
+    }
+    QVector<TaskbarButtonContext> next;
+    int length = 0;
+    elements->get_Length(&length);
+    for (int index = 0; index < length; ++index) {
+        IUIAutomationElement *element = nullptr;
+        if (FAILED(elements->GetElement(index, &element)) || !element) continue;
+        const auto className = automationString([&] { BSTR value = nullptr; element->get_CurrentClassName(&value); return value; }());
+        if (!className.contains(QStringLiteral("TaskListButtonAutomationPeer"), Qt::CaseInsensitive)) { element->Release(); continue; }
+        TaskbarButtonContext button;
+        button.name = automationString([&] { BSTR value = nullptr; element->get_CurrentName(&value); return value; }());
+        button.automationId = automationString([&] { BSTR value = nullptr; element->get_CurrentAutomationId(&value); return value; }());
+        button.element = reinterpret_cast<quintptr>(element);
+        next.append(button);
+    }
+    if (!next.isEmpty()) {
+        releaseTaskbarButtonCache();
+        taskbarButtonCache = std::move(next);
+    }
+    elements->Release();
+    condition->Release();
+    root->Release();
+}
+
+quintptr taskbarButtonForWindow(HWND window)
+{
+    if (!window) return 0;
+    std::array<wchar_t, 512> titleBuffer{};
+    GetWindowTextW(window, titleBuffer.data(), static_cast<int>(titleBuffer.size()));
+    const auto title = QString::fromWCharArray(titleBuffer.data()).trimmed();
+    const auto processName = QFileInfo(processPath(window)).completeBaseName();
+    const auto titleKey = normalizedTaskbarName(title);
+    const auto processKey = normalizedTaskbarName(processName);
+    quintptr singleCandidate = 0;
+    for (const auto &button : taskbarButtonCache) {
+        if (!singleCandidate) singleCandidate = button.element;
+        const auto label = taskbarButtonLabel(button.name);
+        const auto labelKey = normalizedTaskbarName(label);
+        if ((!titleKey.isEmpty() && (titleKey.contains(labelKey) || labelKey.contains(titleKey))) || (!processKey.isEmpty() && !labelKey.isEmpty() && (processKey.contains(labelKey) || labelKey.contains(processKey)))) return button.element;
+    }
+    return taskbarButtonCache.size() == 1 ? singleCandidate : 0;
+}
+
+bool showTaskbarButtonContextMenu(HWND window)
+{
+    if (auto element = taskbarButtonForWindow(window); element && invokeAutomationContextMenu(element)) return true;
+    const auto shell = realTrayWindow();
+    if (!shell) return false;
+    const auto wasHidden = !IsWindowVisible(shell);
+    if (wasHidden) { ShowWindow(shell, SW_SHOWNOACTIVATE); Sleep(120); }
+    cacheTaskbarButtons();
+    const auto element = taskbarButtonForWindow(window);
+    const auto shown = element && invokeAutomationContextMenu(element);
+    if (wasHidden && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
+    return shown;
+}
+
 struct VisibleWindowContext { QSet<HWND> *windows = nullptr; };
 BOOL CALLBACK collectVisibleWindow(HWND window, LPARAM parameter)
 {
@@ -488,6 +587,7 @@ BOOL CALLBACK findNewPopupWindow(HWND window, LPARAM parameter)
 HWND findContextPopup(const QSet<HWND> &before)
 {
     const auto foreground = GetForegroundWindow();
+    if (foreground && !before.contains(foreground) && isPopupWindow(foreground)) return foreground;
     const auto lastPopup = GetLastActivePopup(foreground);
     if (lastPopup && lastPopup != foreground && IsWindowVisible(lastPopup) && isPopupWindow(lastPopup) && (!before.contains(lastPopup) || GetWindow(lastPopup, GW_OWNER))) return lastPopup;
     PopupSearchContext context{ &before };
@@ -512,6 +612,56 @@ void positionContextPopup(HWND popup, const POINT &anchor)
     x = (std::max)(work.left + 8, (std::min)(x, work.right - width - 8));
     y = (std::max)(work.top + 8, (std::min)(y, work.bottom - height - 8));
     SetWindowPos(popup, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
+bool positionExplorerContextPopup(const POINT &anchor)
+{
+    auto *uiAutomation = automation();
+    if (!uiAutomation) return false;
+    IUIAutomationElement *root = nullptr;
+    if (FAILED(uiAutomation->GetRootElement(&root)) || !root) return false;
+    VARIANT value{};
+    value.vt = VT_I4;
+    value.lVal = UIA_MenuItemControlTypeId;
+    IUIAutomationCondition *condition = nullptr;
+    IUIAutomationElementArray *elements = nullptr;
+    if (FAILED(uiAutomation->CreatePropertyCondition(UIA_ControlTypePropertyId, value, &condition)) || !condition || FAILED(root->FindAll(TreeScope_Descendants, condition, &elements)) || !elements) {
+        if (condition) condition->Release();
+        root->Release();
+        return false;
+    }
+    QRect menuBounds;
+    int length = 0;
+    elements->get_Length(&length);
+    for (int index = 0; index < length; ++index) {
+        IUIAutomationElement *element = nullptr;
+        if (FAILED(elements->GetElement(index, &element)) || !element) continue;
+        RECT bounds{};
+        if (SUCCEEDED(element->get_CurrentBoundingRectangle(&bounds)) && bounds.right > bounds.left && bounds.bottom > bounds.top) {
+            const QRect itemBounds(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+            menuBounds = menuBounds.isNull() ? itemBounds : menuBounds.united(itemBounds);
+        }
+        element->Release();
+    }
+    elements->Release();
+    condition->Release();
+    root->Release();
+    if (!menuBounds.isValid() || menuBounds.width() < 80 || menuBounds.height() < 40) return false;
+    const auto core = FindWindowW(L"Windows.UI.Core.CoreWindow", nullptr);
+    RECT coreRect{};
+    if (!core || !GetWindowRect(core, &coreRect)) return false;
+    MONITORINFO monitor{ sizeof(monitor) };
+    const auto monitorHandle = MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST);
+    if (!GetMonitorInfoW(monitorHandle, &monitor)) return false;
+    const auto work = monitor.rcWork;
+    const auto centerY = (work.top + work.bottom) / 2;
+    auto targetX = anchor.x - menuBounds.width() / 2;
+    auto targetY = anchor.y > centerY ? anchor.y - menuBounds.height() - 10 : anchor.y + 10;
+    targetX = (std::max)(work.left + 8, (std::min)(targetX, work.right - menuBounds.width() - 8));
+    targetY = (std::max)(work.top + 8, (std::min)(targetY, work.bottom - menuBounds.height() - 8));
+    const auto deltaX = targetX - menuBounds.left();
+    const auto deltaY = targetY - menuBounds.top();
+    return SetWindowPos(core, nullptr, coreRect.left + deltaX, coreRect.top + deltaY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) != 0;
 }
 
 bool showAutomationContextMenu(const TrayModel::Item &requested, int anchorX, int anchorY)
@@ -714,9 +864,19 @@ void enrichTrayItems(QVector<TrayModel::Item> &items, const QVector<TrayModel::I
 
 RunningAppsModel::RunningAppsModel(QObject *parent) : QAbstractListModel(parent)
 {
+#ifdef Q_OS_WIN
+    cacheTaskbarButtons();
+#endif
     connect(&timer, &QTimer::timeout, this, &RunningAppsModel::refresh);
     timer.start(500);
     refresh();
+}
+
+RunningAppsModel::~RunningAppsModel()
+{
+#ifdef Q_OS_WIN
+    releaseTaskbarButtonCache();
+#endif
 }
 
 int RunningAppsModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : items.size(); }
@@ -821,6 +981,16 @@ void RunningAppsModel::showTaskMenu(const QString &windowHandle, int x, int y)
     const auto value = windowHandle.toULongLong(&ok);
     const auto window = reinterpret_cast<HWND>(static_cast<quintptr>(value));
     if (!ok || !IsWindow(window)) return;
+    const auto before = visibleWindows();
+    if (showTaskbarButtonContextMenu(window)) {
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            if (positionExplorerContextPopup(POINT{ x, y })) break;
+            const auto popup = findContextPopup(before);
+            if (popup) { positionContextPopup(popup, POINT{ x, y }); break; }
+            Sleep(10);
+        }
+        return;
+    }
     const auto menu = GetSystemMenu(window, FALSE);
     if (!menu) return;
     const auto owner = FindWindowW(nullptr, L"Tasked");
