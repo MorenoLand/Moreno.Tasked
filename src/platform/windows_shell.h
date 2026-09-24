@@ -71,11 +71,13 @@ public:
     int count() const { return rowCount(); }
     Q_INVOKABLE void launchPinned(const QString &appId);
     Q_INVOKABLE void showPinnedTaskMenu(const QString &appId, int x, int y);
+    Q_INVOKABLE void move(int from, int to);
 signals:
     void countChanged();
 private:
     void refresh();
     RunningAppsModel *running = nullptr;
+    QStringList taskbarOrder;
     QVector<Item> items;
     QTimer timer;
 };

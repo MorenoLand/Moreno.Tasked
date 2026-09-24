@@ -1101,6 +1101,7 @@ void RunningAppsModel::close(const QString &windowHandle)
 
 TaskbarAppsModel::TaskbarAppsModel(RunningAppsModel *runningApps, QObject *parent) : QAbstractListModel(parent), running(runningApps)
 {
+    taskbarOrder = QSettings().value("taskbar/taskbarOrder").toStringList();
     connect(running, &QAbstractItemModel::modelReset, this, &TaskbarAppsModel::refresh);
     connect(running, &QAbstractItemModel::dataChanged, this, &TaskbarAppsModel::refresh);
     refresh();
@@ -1159,6 +1160,18 @@ void TaskbarAppsModel::refresh()
         const auto &entry = runningEntries.at(index);
         next.append({ entry.appId, entry.title, entry.iconSource, entry.windowHandle, entry.active, false, true });
     }
+    if (!taskbarOrder.isEmpty()) {
+        QVector<Item> ordered;
+        QSet<QString> placed;
+        for (const auto &appId : taskbarOrder) {
+            const auto found = std::find_if(next.cbegin(), next.cend(), [&appId, &placed](const Item &item) { return !appId.isEmpty() && item.appId == appId && !placed.contains(item.appId); });
+            if (found == next.cend()) continue;
+            placed.insert(found->appId);
+            ordered.append(*found);
+        }
+        for (const auto &item : next) if (item.appId.isEmpty() || !placed.contains(item.appId)) ordered.append(item);
+        next = std::move(ordered);
+    }
     if (next == items) return;
     const auto oldCount = items.size();
     beginResetModel();
@@ -1212,6 +1225,17 @@ void TaskbarAppsModel::showPinnedTaskMenu(const QString &appId, int x, int y)
     Q_UNUSED(x);
     Q_UNUSED(y);
 #endif
+}
+
+void TaskbarAppsModel::move(int from, int to)
+{
+    if (from < 0 || to < 0 || from >= items.size() || to >= items.size() || from == to) return;
+    if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), to > from ? to + 1 : to)) return;
+    items.move(from, to);
+    endMoveRows();
+    taskbarOrder.clear();
+    for (const auto &item : items) if (!item.appId.isEmpty() && !taskbarOrder.contains(item.appId)) taskbarOrder.append(item.appId);
+    QSettings().setValue("taskbar/taskbarOrder", taskbarOrder);
 }
 
 TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
