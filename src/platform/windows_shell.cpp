@@ -122,6 +122,16 @@ HWND realTrayWindow()
     return result;
 }
 
+bool inputDesktopLocked()
+{
+    const auto desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+    if (!desktop) return true;
+    USEROBJECTFLAGS flags{ sizeof(flags) };
+    const auto ok = GetUserObjectInformation(desktop, UOI_FLAGS, &flags, sizeof(flags), nullptr);
+    CloseDesktop(desktop);
+    return !ok || (flags.dwFlags & WSF_VISIBLE) == 0;
+}
+
 qulonglong observedTrayKey(qulonglong owner, quint32 id) { return owner ^ (static_cast<qulonglong>(id) << 32); }
 
 void observeTrayMessage(const COPYDATASTRUCT *copy)
@@ -976,6 +986,7 @@ bool RunningAppsModel::isAppRunning(const QString &appId) const
 void RunningAppsModel::refresh()
 {
 #ifdef Q_OS_WIN
+    if (inputDesktopLocked()) return;
     WindowRefreshContext context{ {}, GetForegroundWindow() };
     EnumWindows(enumerateWindows, reinterpret_cast<LPARAM>(&context));
     for (auto &item : context.items) {
@@ -1353,10 +1364,12 @@ QHash<int, QByteArray> TrayModel::roleNames() const { return trayRoleNames(); }
 void TrayModel::refresh()
 {
 #ifdef Q_OS_WIN
+    if (inputDesktopLocked()) return;
     const auto shell = realTrayWindow();
     if (shell) tasked::trayhook::requestScan(shell);
     const auto visible = shell && IsWindowVisible(shell);
-    QVector<Item> next = automationTrayItems();
+    QVector<Item> next;
+    if (visible) next = automationTrayItems();
     const auto uiAutomationEmpty = next.isEmpty();
     QVector<Item> native = trayNotifyItems();
     for (const auto toolbar : trayToolbars()) enumerateToolbar(toolbar, native);
