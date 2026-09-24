@@ -22,4 +22,4 @@ void tasked::platform::setDockPosition(int) {}
 
 void tasked::platform::uninstallDock() {}
 
-int tasked::platform::runTaskbarGuard(quint32) { return 0; }
+int tasked::platform::runTaskbarGuard(quint32, const QRect &) { return 0; }

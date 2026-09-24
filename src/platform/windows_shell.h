@@ -22,6 +22,7 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
     Q_INVOKABLE void activate(const QString &windowHandle);
+    Q_INVOKABLE void activate(const QString &windowHandle, bool wasActiveAtPress);
     Q_INVOKABLE void showTaskMenu(const QString &windowHandle, int x, int y);
     Q_INVOKABLE void close(const QString &windowHandle);
     Q_INVOKABLE void move(int from, int to);
@@ -36,7 +37,7 @@ class TrayModel final : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(quint64 iconRevision READ iconRevision NOTIFY iconRevisionChanged)
 public:
-    struct Item { qulonglong key = 0; qulonglong owner = 0; quint32 id = 0; quint32 callback = 0; quint32 version = 0; quintptr icon = 0; QString tooltip; QImage image; QImage iconImage; QString automationId; int ordinal = 0; quintptr automationElement = 0; QRect bounds; };
+    struct Item { qulonglong key = 0; qulonglong owner = 0; quint32 id = 0; quint32 callback = 0; quint32 version = 0; quintptr icon = 0; QString tooltip; QImage iconImage; QString automationId; int ordinal = 0; quintptr automationElement = 0; QRect bounds; };
     enum Role { KeyRole = Qt::UserRole + 1, TooltipRole };
     explicit TrayModel(QObject *parent = nullptr);
     ~TrayModel() override;

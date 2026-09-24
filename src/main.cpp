@@ -22,7 +22,7 @@
 int main(int argc, char *argv[])
 {
 #ifdef Q_OS_WIN
-    if (argc >= 3 && QString::fromLocal8Bit(argv[1]) == "--tasked-taskbar-guard") return tasked::platform::runTaskbarGuard(QString::fromLocal8Bit(argv[2]).toUInt());
+    if (argc >= 7 && QString::fromLocal8Bit(argv[1]) == "--tasked-taskbar-guard") { const auto left = QString::fromLocal8Bit(argv[3]).toInt(); const auto top = QString::fromLocal8Bit(argv[4]).toInt(); const auto right = QString::fromLocal8Bit(argv[5]).toInt(); const auto bottom = QString::fromLocal8Bit(argv[6]).toInt(); return tasked::platform::runTaskbarGuard(QString::fromLocal8Bit(argv[2]).toUInt(), QRect(left, top, right - left, bottom - top)); }
 #endif
     QCoreApplication::setOrganizationName("Tasked");
     QCoreApplication::setApplicationName("Tasked");

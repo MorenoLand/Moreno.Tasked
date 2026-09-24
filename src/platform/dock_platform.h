@@ -12,5 +12,5 @@ void showSystemTrayFlyout(const QRect &anchor);
 QRect installDock(QWindow *visualWindow, int height, int position);
 void setDockPosition(int position);
 void uninstallDock();
-int runTaskbarGuard(quint32 parentPid);
+int runTaskbarGuard(quint32 parentPid, const QRect &originalWorkArea);
 }

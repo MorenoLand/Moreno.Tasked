@@ -32,6 +32,7 @@ class TaskedSettings final : public QObject
     Q_PROPERTY(int surfaceOpacity READ surfaceOpacity WRITE setSurfaceOpacity NOTIFY surfaceOpacityChanged)
     Q_PROPERTY(int backgroundOpacity READ backgroundOpacity WRITE setBackgroundOpacity NOTIFY backgroundOpacityChanged)
     Q_PROPERTY(int cornerRadius READ cornerRadius WRITE setCornerRadius NOTIFY cornerRadiusChanged)
+    Q_PROPERTY(int shadowStyle READ shadowStyle WRITE setShadowStyle NOTIFY shadowStyleChanged)
 public:
     explicit TaskedSettings(QObject *parent = nullptr);
     bool splitMode() const;
@@ -61,6 +62,7 @@ public:
     int surfaceOpacity() const;
     int backgroundOpacity() const;
     int cornerRadius() const;
+    int shadowStyle() const;
     Q_INVOKABLE void setSplitMode(bool enabled);
     Q_INVOKABLE void setSpacedMode(bool enabled);
     Q_INVOKABLE void setDockLocked(bool enabled);
@@ -91,6 +93,7 @@ public:
     Q_INVOKABLE void setSurfaceOpacity(int value);
     Q_INVOKABLE void setBackgroundOpacity(int value);
     Q_INVOKABLE void setCornerRadius(int value);
+    Q_INVOKABLE void setShadowStyle(int value);
     Q_INVOKABLE void reset();
 signals:
     void splitModeChanged();
@@ -120,6 +123,7 @@ signals:
     void surfaceOpacityChanged();
     void backgroundOpacityChanged();
     void cornerRadiusChanged();
+    void shadowStyleChanged();
     void sectionOffsetsChanged();
 private:
     bool split = false;
@@ -149,4 +153,5 @@ private:
     int opacity = 100;
     int background = 100;
     int radius = 22;
+    int shadow = 0;
 };
