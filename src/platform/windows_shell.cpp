@@ -531,6 +531,26 @@ void cacheTaskbarButtons()
     root->Release();
 }
 
+void refreshTaskbarButtonCache()
+{
+    const auto shell = realTrayWindow();
+    if (!shell) return;
+    const auto wasHidden = !IsWindowVisible(shell);
+    if (wasHidden) { ShowWindow(shell, SW_SHOWNOACTIVATE); Sleep(100); }
+    cacheTaskbarButtons();
+    if (wasHidden && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
+}
+
+bool taskbarElementPresent(quintptr pointer)
+{
+    if (!pointer) return false;
+    auto *element = reinterpret_cast<IUIAutomationElement *>(pointer);
+    BOOL offscreen = FALSE;
+    if (FAILED(element->get_CurrentIsOffscreen(&offscreen)) || offscreen) return false;
+    RECT bounds{};
+    return SUCCEEDED(element->get_CurrentBoundingRectangle(&bounds)) && bounds.right > bounds.left && bounds.bottom > bounds.top;
+}
+
 const TaskbarButtonContext *taskbarButtonForAppId(const QString &appId)
 {
     const auto found = std::find_if(taskbarButtonCache.cbegin(), taskbarButtonCache.cend(), [&appId](const TaskbarButtonContext &button) { return !appId.isEmpty() && button.automationId == appId; });
@@ -1113,6 +1133,18 @@ void RunningAppsModel::close(const QString &windowHandle)
 TaskbarAppsModel::TaskbarAppsModel(RunningAppsModel *runningApps, QObject *parent) : QAbstractListModel(parent), running(runningApps)
 {
     taskbarOrder = QSettings().value("taskbar/taskbarOrder").toStringList();
+    pinRefreshTimer.setInterval(150);
+    connect(&pinRefreshTimer, &QTimer::timeout, this, [this] {
+        if (pendingTaskbarElement && !taskbarElementPresent(pendingTaskbarElement)) {
+            pendingTaskbarElement = 0;
+            pinRefreshTimer.stop();
+            refreshTaskbarButtonCache();
+            refresh();
+        } else if (++pinRefreshTicks >= 30) {
+            pendingTaskbarElement = 0;
+            pinRefreshTimer.stop();
+        }
+    });
     connect(running, &QAbstractItemModel::modelReset, this, &TaskbarAppsModel::refresh);
     connect(running, &QAbstractItemModel::dataChanged, this, &TaskbarAppsModel::refresh);
     refresh();
@@ -1216,6 +1248,9 @@ void TaskbarAppsModel::showPinnedTaskMenu(const QString &appId, int x, int y)
     const auto before = visibleWindows();
     auto element = taskbarButtonForAppId(appId);
     if (element && invokeAutomationContextMenu(element->element)) {
+        pendingTaskbarElement = element->element;
+        pinRefreshTicks = 0;
+        pinRefreshTimer.start();
         for (int attempt = 0; attempt < 20; ++attempt) {
             const auto popup = findContextPopup(before);
             if (popup) { positionContextPopup(popup, POINT{ x, y }); break; }
@@ -1229,7 +1264,12 @@ void TaskbarAppsModel::showPinnedTaskMenu(const QString &appId, int x, int y)
     if (wasHidden) { ShowWindow(shell, SW_SHOWNOACTIVATE); Sleep(120); }
     cacheTaskbarButtons();
     const auto cached = taskbarButtonForAppId(appId);
-    if (cached) invokeAutomationContextMenu(cached->element);
+    if (cached) {
+        invokeAutomationContextMenu(cached->element);
+        pendingTaskbarElement = cached->element;
+        pinRefreshTicks = 0;
+        pinRefreshTimer.start();
+    }
     if (wasHidden && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
 #else
     Q_UNUSED(appId);
