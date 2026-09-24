@@ -369,7 +369,10 @@ winrt::Windows::Foundation::IAsyncAction CaptureIconsAsync(ScanRequest request, 
         try {
             if (item.content.Visibility() != xaml::Visibility::Visible || item.content.ActualWidth() <= 0.0 || item.content.ActualHeight() <= 0.0) { complete = false; break; }
             xaml::Media::Imaging::RenderTargetBitmap bitmap;
-            co_await bitmap.RenderAsync(item.content);
+            const auto captureScale = (std::max)(1.0, xamlRoot.RasterizationScale()) * 2.0;
+            const auto requestedWidth = (std::min)(static_cast<int>(std::ceil(item.content.ActualWidth() * captureScale)), static_cast<int>(maxIconSide));
+            const auto requestedHeight = (std::min)(static_cast<int>(std::ceil(item.content.ActualHeight() * captureScale)), static_cast<int>(maxIconSide));
+            co_await bitmap.RenderAsync(item.content, requestedWidth, requestedHeight);
             const auto width = bitmap.PixelWidth();
             const auto height = bitmap.PixelHeight();
             if (width <= 0 || height <= 0 || static_cast<std::uint32_t>(width) > maxIconSide || static_cast<std::uint32_t>(height) > maxIconSide) { complete = false; break; }
