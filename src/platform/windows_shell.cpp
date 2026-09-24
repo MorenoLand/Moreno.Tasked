@@ -614,56 +614,6 @@ void positionContextPopup(HWND popup, const POINT &anchor)
     SetWindowPos(popup, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 }
 
-bool positionExplorerContextPopup(const POINT &anchor)
-{
-    auto *uiAutomation = automation();
-    if (!uiAutomation) return false;
-    IUIAutomationElement *root = nullptr;
-    if (FAILED(uiAutomation->GetRootElement(&root)) || !root) return false;
-    VARIANT value{};
-    value.vt = VT_I4;
-    value.lVal = UIA_MenuItemControlTypeId;
-    IUIAutomationCondition *condition = nullptr;
-    IUIAutomationElementArray *elements = nullptr;
-    if (FAILED(uiAutomation->CreatePropertyCondition(UIA_ControlTypePropertyId, value, &condition)) || !condition || FAILED(root->FindAll(TreeScope_Descendants, condition, &elements)) || !elements) {
-        if (condition) condition->Release();
-        root->Release();
-        return false;
-    }
-    QRect menuBounds;
-    int length = 0;
-    elements->get_Length(&length);
-    for (int index = 0; index < length; ++index) {
-        IUIAutomationElement *element = nullptr;
-        if (FAILED(elements->GetElement(index, &element)) || !element) continue;
-        RECT bounds{};
-        if (SUCCEEDED(element->get_CurrentBoundingRectangle(&bounds)) && bounds.right > bounds.left && bounds.bottom > bounds.top) {
-            const QRect itemBounds(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
-            menuBounds = menuBounds.isNull() ? itemBounds : menuBounds.united(itemBounds);
-        }
-        element->Release();
-    }
-    elements->Release();
-    condition->Release();
-    root->Release();
-    if (!menuBounds.isValid() || menuBounds.width() < 80 || menuBounds.height() < 40) return false;
-    const auto core = FindWindowW(L"Windows.UI.Core.CoreWindow", nullptr);
-    RECT coreRect{};
-    if (!core || !GetWindowRect(core, &coreRect)) return false;
-    MONITORINFO monitor{ sizeof(monitor) };
-    const auto monitorHandle = MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST);
-    if (!GetMonitorInfoW(monitorHandle, &monitor)) return false;
-    const auto work = monitor.rcWork;
-    const auto centerY = (work.top + work.bottom) / 2;
-    auto targetX = anchor.x - menuBounds.width() / 2;
-    auto targetY = anchor.y > centerY ? anchor.y - menuBounds.height() - 10 : anchor.y + 10;
-    targetX = (std::max)(work.left + 8, (std::min)(targetX, work.right - menuBounds.width() - 8));
-    targetY = (std::max)(work.top + 8, (std::min)(targetY, work.bottom - menuBounds.height() - 8));
-    const auto deltaX = targetX - menuBounds.left();
-    const auto deltaY = targetY - menuBounds.top();
-    return SetWindowPos(core, nullptr, coreRect.left + deltaX, coreRect.top + deltaY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) != 0;
-}
-
 bool showAutomationContextMenu(const TrayModel::Item &requested, int anchorX, int anchorY)
 {
     const auto before = visibleWindows();
@@ -984,7 +934,6 @@ void RunningAppsModel::showTaskMenu(const QString &windowHandle, int x, int y)
     const auto before = visibleWindows();
     if (showTaskbarButtonContextMenu(window)) {
         for (int attempt = 0; attempt < 20; ++attempt) {
-            if (positionExplorerContextPopup(POINT{ x, y })) break;
             const auto popup = findContextPopup(before);
             if (popup) { positionContextPopup(popup, POINT{ x, y }); break; }
             Sleep(10);
