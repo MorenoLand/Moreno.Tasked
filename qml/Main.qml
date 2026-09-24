@@ -480,7 +480,11 @@ Window {
             visible: root.trayEnabled
             property real freeX: taskedSettings.sectionOffsetX("tray")
             property real freeY: taskedSettings.sectionOffsetY("tray")
-            transform: Translate { x: (root.verticalDock ? (root.dockSectionHeight - root.trayFlowWidth) / 2 : 0) + root.splitTrayOffsetX + (root.dockLocked ? 0 : trayPanel.freeX); y: (root.verticalDock ? 0 : (root.dockSectionHeight - root.trayHeight) / 2) + root.splitTrayOffsetY + (root.dockLocked ? 0 : trayPanel.freeY) }
+            transform: Translate {
+                 x: (root.verticalDock ? (root.dockSectionHeight - root.trayFlowWidth) / 2 : 0) + root.splitTrayOffsetX + (root.dockLocked ? 0 : trayPanel.freeX)
+                 y: (root.verticalDock ? 0 : (root.dockSectionHeight - root.trayHeight) / 2) + root.splitTrayOffsetY + (root.dockLocked ? 0 : trayPanel.freeY)
+                 Behavior on x { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+             }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
             Behavior on opacity { NumberAnimation { duration: root.fadeAnimationDuration } }
@@ -641,7 +645,11 @@ Window {
             Loader { anchors.fill: parent; property real glassRadius: parent.radius; active: root.splitMode || !root.trayEnabled; sourceComponent: liquidGlassOverlay }
             property real freeX: taskedSettings.sectionOffsetX("clock")
             property real freeY: taskedSettings.sectionOffsetY("clock")
-            transform: Translate { x: root.splitClockOffsetX + (root.dockLocked ? 0 : clockPanel.freeX); y: root.splitClockOffsetY + (root.dockLocked ? 0 : clockPanel.freeY) }
+            transform: Translate {
+                 x: root.splitClockOffsetX + (root.dockLocked ? 0 : clockPanel.freeX)
+                 y: root.splitClockOffsetY + (root.dockLocked ? 0 : clockPanel.freeY)
+                 Behavior on x { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+             }
             Behavior on radius { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
             Behavior on color { ColorAnimation { duration: root.animationDuration } }
             Column {
