@@ -48,10 +48,38 @@ HWND traySpyWindow = nullptr;
 bool traySpyClassOwned = false;
 QVector<TrayModel::Item> observedTrayItems;
 QHash<qulonglong, QImage> xamlTrayImages;
-struct XamlTrayImage { QString automationId; QString name; int ordinal = 0; QPoint screen; QImage image; };
+QHash<qulonglong, QImage> pendingXamlTrayImages;
+struct XamlTrayImage { QString automationId; QString name; int ordinal = 0; QRect bounds; QImage image; };
 QVector<XamlTrayImage> xamlTrayImageItems;
+QVector<XamlTrayImage> pendingXamlTrayImageItems;
 quint64 xamlTrayImageGeneration = 0;
+quint64 pendingXamlTrayImageGeneration = 0;
 qulonglong automationKey(const QString &automationId, const QString &name, int ordinal);
+bool hasVisiblePixels(const QImage &image);
+
+QImage usableTrayImage(const QImage &source)
+{
+    if (source.isNull()) return {};
+    const auto image = source.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    if (image.isNull()) return {};
+    int left = image.width();
+    int top = image.height();
+    int right = -1;
+    int bottom = -1;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qAlpha(image.pixel(x, y)) <= 2) continue;
+            left = qMin(left, x);
+            top = qMin(top, y);
+            right = qMax(right, x);
+            bottom = qMax(bottom, y);
+        }
+    }
+    if (right < 0) return {};
+    if (left == 0 && top == 0 && right == image.width() - 1 && bottom == image.height() - 1) return image;
+    const auto content = QRect(QPoint(left, top), QPoint(right, bottom)).adjusted(-1, -1, 1, 1).intersected(image.rect());
+    return image.copy(content);
+}
 
 #pragma pack(push, 4)
 struct ShellNotifyIconDataPrefix { quint32 callbackSize; quint32 owner; quint32 id; quint32 flags; quint32 callback; quint32 icon; wchar_t tooltip[128]; quint32 state; quint32 stateMask; wchar_t info[256]; quint32 version; };
@@ -154,27 +182,46 @@ LRESULT CALLBACK traySpyWindowProc(HWND window, UINT message, WPARAM wParam, LPA
         const auto *copy = reinterpret_cast<const COPYDATASTRUCT *>(lParam);
         if (copy && copy->dwData == tasked::trayhook::copyDataTag && copy->lpData && copy->cbData >= sizeof(tasked::trayhook::IconPacketHeader)) {
             const auto *header = static_cast<const tasked::trayhook::IconPacketHeader *>(copy->lpData);
+            if (header->magic != tasked::trayhook::packetMagic || header->version != tasked::trayhook::protocolVersion) return FALSE;
+            if (header->requestId <= xamlTrayImageGeneration) return TRUE;
+            if (header->packetKind == tasked::trayhook::scanCompletePacketKind) {
+                if (copy->cbData != sizeof(*header)) return FALSE;
+                if (header->expectedPacketCount > tasked::trayhook::maxTrayItems) return FALSE;
+                if (header->requestId > pendingXamlTrayImageGeneration) { pendingXamlTrayImages.clear(); pendingXamlTrayImageItems.clear(); pendingXamlTrayImageGeneration = header->requestId; }
+                if (header->requestId != pendingXamlTrayImageGeneration) return TRUE;
+                if (header->expectedPacketCount != static_cast<std::uint32_t>(pendingXamlTrayImageItems.size())) { pendingXamlTrayImages.clear(); pendingXamlTrayImageItems.clear(); pendingXamlTrayImageGeneration = 0; return TRUE; }
+                xamlTrayImages = std::move(pendingXamlTrayImages);
+                xamlTrayImageItems = std::move(pendingXamlTrayImageItems);
+                xamlTrayImageGeneration = header->requestId;
+                pendingXamlTrayImageGeneration = 0;
+                SetPropW(window, L"Tasked.Debug.TrayImages", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(xamlTrayImages.size() + 1)));
+                SetPropW(window, L"Tasked.Debug.XamlItems", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(xamlTrayImageItems.size() + 1)));
+                return TRUE;
+            }
+            if (header->packetKind != tasked::trayhook::iconPacketKind) return FALSE;
+            if (header->automationIdLength > tasked::trayhook::maxPacketTextBytes || header->nameLength > tasked::trayhook::maxPacketTextBytes) return FALSE;
             const auto textBytes = static_cast<size_t>(header->automationIdLength) + header->nameLength;
             const auto pixelOffset = sizeof(*header) + textBytes;
             const auto pixelBytes = static_cast<size_t>(header->pixelBytes);
-            if (header->magic == tasked::trayhook::packetMagic && header->version == tasked::trayhook::protocolVersion && header->width > 0 && header->height > 0 && header->width <= 128 && header->height <= 128 && header->stride >= header->width * 4 && pixelBytes >= static_cast<size_t>(header->stride) * header->height && pixelOffset <= copy->cbData && pixelBytes <= copy->cbData - pixelOffset) {
-                if (header->requestId > xamlTrayImageGeneration) { xamlTrayImages.clear(); xamlTrayImageItems.clear(); xamlTrayImageGeneration = header->requestId; }
-                if (header->requestId != xamlTrayImageGeneration) return TRUE;
+            if (header->screenWidth > 0 && header->screenHeight > 0 && header->screenWidth <= tasked::trayhook::maxIconSide && header->screenHeight <= tasked::trayhook::maxIconSide && header->width > 0 && header->height > 0 && header->width <= tasked::trayhook::maxIconSide && header->height <= tasked::trayhook::maxIconSide && header->stride == header->width * 4 && pixelBytes <= tasked::trayhook::maxIconPixelBytes && pixelBytes == static_cast<size_t>(header->stride) * header->height && pixelOffset <= copy->cbData && pixelBytes == copy->cbData - pixelOffset) {
+                if (header->requestId > pendingXamlTrayImageGeneration) { pendingXamlTrayImages.clear(); pendingXamlTrayImageItems.clear(); pendingXamlTrayImageGeneration = header->requestId; }
+                if (header->requestId != pendingXamlTrayImageGeneration) return TRUE;
                 const auto *text = static_cast<const char *>(copy->lpData) + sizeof(*header);
                 const auto automationId = QString::fromUtf8(text, static_cast<int>(header->automationIdLength));
                 const auto name = QString::fromUtf8(text + header->automationIdLength, static_cast<int>(header->nameLength));
                 const auto *pixels = reinterpret_cast<const uchar *>(static_cast<const char *>(copy->lpData) + pixelOffset);
                 const QImage image(pixels, static_cast<int>(header->width), static_cast<int>(header->height), static_cast<int>(header->stride), QImage::Format_ARGB32_Premultiplied);
-                if (!image.isNull() && (!automationId.isEmpty() || !name.isEmpty())) {
+                if (!image.isNull() && hasVisiblePixels(image) && (!automationId.isEmpty() || !name.isEmpty())) {
+                    const auto copyImage = usableTrayImage(image);
+                    if (copyImage.isNull()) return TRUE;
                     const auto ordinal = static_cast<int>(header->ordinal);
                     const auto key = automationKey(automationId, name, ordinal);
-                    const auto copyImage = image.copy();
-                    xamlTrayImages.insert(key, copyImage);
-                    const QPoint screen(header->screenX, header->screenY);
-                    const auto existing = std::find_if(xamlTrayImageItems.begin(), xamlTrayImageItems.end(), [&automationId, &name, ordinal](const XamlTrayImage &candidate) { return candidate.automationId == automationId && candidate.name == name && candidate.ordinal == ordinal; });
-                    if (existing == xamlTrayImageItems.end()) xamlTrayImageItems.append({automationId, name, ordinal, screen, copyImage});
-                    else { existing->screen = screen; existing->image = copyImage; }
-                    if (xamlTrayImageItems.size() > 256) xamlTrayImageItems.removeFirst();
+                    pendingXamlTrayImages.insert(key, copyImage);
+                    const QRect bounds(header->screenX, header->screenY, header->screenWidth, header->screenHeight);
+                    const auto existing = std::find_if(pendingXamlTrayImageItems.begin(), pendingXamlTrayImageItems.end(), [&automationId, &name, ordinal](const XamlTrayImage &candidate) { return candidate.automationId == automationId && candidate.name == name && candidate.ordinal == ordinal; });
+                    if (existing == pendingXamlTrayImageItems.end()) pendingXamlTrayImageItems.append({automationId, name, ordinal, bounds, copyImage});
+                    else { existing->bounds = bounds; existing->image = copyImage; }
+                    if (pendingXamlTrayImageItems.size() > tasked::trayhook::maxTrayItems) { pendingXamlTrayImages.clear(); pendingXamlTrayImageItems.clear(); pendingXamlTrayImageGeneration = 0; return FALSE; }
                 }
                 return TRUE;
             }
@@ -225,45 +272,6 @@ void uninstallTraySpy()
     observedTrayItems.clear();
 }
 
-QImage trayIconImage(quintptr handle)
-{
-    const auto copy = CopyIcon(reinterpret_cast<HICON>(handle));
-    if (!copy) return {};
-    QImage image;
-    ICONINFO iconInfo{};
-    if (GetIconInfo(copy, &iconInfo)) {
-        BITMAP bitmap{};
-        if (iconInfo.hbmColor && GetObjectW(iconInfo.hbmColor, sizeof(bitmap), &bitmap) == sizeof(bitmap) && bitmap.bmWidth > 0 && bitmap.bmHeight > 0) {
-            const auto width = bitmap.bmWidth;
-            const auto height = bitmap.bmHeight;
-            image = QImage(width, height, QImage::Format_ARGB32);
-            BITMAPINFO bitmapInfo{};
-            bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bitmapInfo.bmiHeader.biWidth = width;
-            bitmapInfo.bmiHeader.biHeight = -height;
-            bitmapInfo.bmiHeader.biPlanes = 1;
-            bitmapInfo.bmiHeader.biBitCount = 32;
-            bitmapInfo.bmiHeader.biCompression = BI_RGB;
-            const auto dc = GetDC(nullptr);
-            const auto colorRows = dc && GetDIBits(dc, iconInfo.hbmColor, 0, height, image.bits(), &bitmapInfo, DIB_RGB_COLORS) == height;
-            if (colorRows && iconInfo.hbmMask) {
-                bool hasAlpha = false;
-                for (int y = 0; y < height && !hasAlpha; ++y) for (int x = 0; x < width && !hasAlpha; ++x) hasAlpha = qAlpha(image.pixel(x, y)) != 0;
-                if (!hasAlpha) {
-                    QImage mask(width, height, QImage::Format_ARGB32);
-                    if (GetDIBits(dc, iconInfo.hbmMask, 0, height, mask.bits(), &bitmapInfo, DIB_RGB_COLORS) == height) for (int y = 0; y < height; ++y) for (int x = 0; x < width; ++x) image.setPixel(x, y, (image.pixel(x, y) & 0x00ffffff) | (qRed(mask.pixel(x, y)) == 255 ? 0 : 0xff000000));
-                }
-            } else if (!colorRows) image = {};
-            if (dc) ReleaseDC(nullptr, dc);
-        }
-        if (iconInfo.hbmMask) DeleteObject(iconInfo.hbmMask);
-        if (iconInfo.hbmColor) DeleteObject(iconInfo.hbmColor);
-    }
-    if (image.isNull()) image = QImage::fromHICON(copy);
-    DestroyIcon(copy);
-    return image;
-}
-
 struct ShellNotifyItem { PWSTR exeName; PWSTR tooltip; HICON icon; HWND owner; DWORD preference; UINT id; GUID guid; };
 
 struct __declspec(uuid("D782CCBA-AFB0-43F1-94DB-FDA3779EACCB")) ITaskedTrayNotifyCallback : IUnknown { virtual HRESULT STDMETHODCALLTYPE Notify(ULONG event, ShellNotifyItem *item) = 0; };
@@ -281,14 +289,13 @@ public:
     ULONG STDMETHODCALLTYPE AddRef() override { return ++references; }
     ULONG STDMETHODCALLTYPE Release() override { return --references; }
     HRESULT STDMETHODCALLTYPE Notify(ULONG, ShellNotifyItem *item) override {
-        if (!item || !item->owner || !item->icon) return S_OK;
+        if (!item || !item->owner) return S_OK;
         TrayModel::Item trayItem;
         trayItem.owner = reinterpret_cast<quintptr>(item->owner);
         trayItem.id = item->id;
         trayItem.icon = reinterpret_cast<quintptr>(item->icon);
         trayItem.tooltip = item->tooltip ? QString::fromWCharArray(item->tooltip) : QString();
         trayItem.key = static_cast<qulonglong>(trayItem.owner) ^ (static_cast<qulonglong>(trayItem.id) << 32);
-        trayItem.iconImage = trayIconImage(trayItem.icon);
         NOTIFYICONIDENTIFIER identifier{};
         identifier.cbSize = sizeof(identifier);
         identifier.hWnd = item->owner;
@@ -344,7 +351,23 @@ QString automationString(BSTR value)
     return result;
 }
 
-qulonglong automationKey(const QString &automationId, const QString &name, int ordinal) { return static_cast<qulonglong>(qHash(automationId + QLatin1Char('\n') + name + QLatin1Char('\n') + QString::number(ordinal))); }
+qulonglong automationKey(const QString &automationId, const QString &name, int ordinal)
+{
+    QByteArray value = automationId.toUtf8();
+    value.append('\0');
+    value += name.toUtf8();
+    value.append('\0');
+    value += QByteArray::number(ordinal);
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const auto byte : value) { hash ^= static_cast<unsigned char>(byte); hash *= 1099511628211ULL; }
+    return hash ? static_cast<qulonglong>(hash) : 1;
+}
+
+bool hasVisiblePixels(const QImage &image)
+{
+    for (int y = 0; y < image.height(); ++y) { const auto *row = reinterpret_cast<const QRgb *>(image.constScanLine(y)); for (int x = 0; x < image.width(); ++x) if (qAlpha(row[x])) return true; }
+    return false;
+}
 
 QVector<TrayModel::Item> automationTrayItems()
 {
@@ -367,6 +390,7 @@ QVector<TrayModel::Item> automationTrayItems()
     }
     QHash<QString, int> ordinals;
     int length = 0;
+    int validBounds = 0;
     elements->get_Length(&length);
     for (int index = 0; index < length; ++index) {
         IUIAutomationElement *element = nullptr;
@@ -390,9 +414,11 @@ QVector<TrayModel::Item> automationTrayItems()
         item.automationId = automationId;
         item.ordinal = ordinal;
         item.automationElement = reinterpret_cast<quintptr>(element);
-        if (bounds.right > bounds.left && bounds.bottom > bounds.top) item.bounds = QRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+        if (bounds.right > bounds.left && bounds.bottom > bounds.top) { item.bounds = QRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top); ++validBounds; }
         result.append(item);
     }
+    SetPropW(traySpyWindow, L"Tasked.Debug.UIAButtons", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(length + 1)));
+    SetPropW(traySpyWindow, L"Tasked.Debug.UIABounds", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(validBounds + 1)));
     elements->Release();
     condition->Release();
     root->Release();
@@ -412,6 +438,54 @@ bool invokeAutomationItem(quintptr elementPointer)
     if (FAILED(element->GetCurrentPatternAs(UIA_InvokePatternId, IID_PPV_ARGS(&pattern))) || !pattern) return false;
     const auto result = SUCCEEDED(pattern->Invoke());
     pattern->Release();
+    return result;
+}
+
+bool invokeAutomationContextMenu(quintptr elementPointer)
+{
+    if (!elementPointer) return false;
+    auto *element = reinterpret_cast<IUIAutomationElement *>(elementPointer);
+    IUIAutomationElement3 *contextElement = nullptr;
+    const auto queried = SUCCEEDED(element->QueryInterface(IID_PPV_ARGS(&contextElement))) && contextElement;
+    const auto result = queried && SUCCEEDED(contextElement->ShowContextMenu());
+    if (contextElement) contextElement->Release();
+    return result;
+}
+
+bool showAutomationContextMenu(const TrayModel::Item &requested)
+{
+    if (requested.automationElement && invokeAutomationContextMenu(requested.automationElement)) return true;
+    const auto shell = realTrayWindow();
+    const auto restoreTaskbar = shell && !IsWindowVisible(shell);
+    if (restoreTaskbar) {
+        ShowWindow(shell, SW_SHOW);
+        Sleep(150);
+    }
+    auto current = automationTrayItems();
+    auto found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && candidate.key == requested.key; });
+    if (found == current.cend() && !requested.tooltip.isEmpty()) {
+        found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && trayTextMatches(candidate.tooltip, requested.tooltip); });
+    }
+    if (found == current.cend() && !requested.automationId.isEmpty()) {
+        found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && candidate.automationId == requested.automationId && candidate.ordinal == requested.ordinal; });
+    }
+    if (found == current.cend() && requested.bounds.isValid()) {
+        const auto requestedCenter = requested.bounds.center();
+        auto nearest = current.cend();
+        qint64 nearestDistance = std::numeric_limits<qint64>::max();
+        for (auto candidate = current.cbegin(); candidate != current.cend(); ++candidate) {
+            if (!candidate->automationElement || !candidate->bounds.isValid()) continue;
+            const auto candidateCenter = candidate->bounds.center();
+            const auto deltaX = static_cast<qint64>(requestedCenter.x()) - candidateCenter.x();
+            const auto deltaY = static_cast<qint64>(requestedCenter.y()) - candidateCenter.y();
+            const auto distance = deltaX * deltaX + deltaY * deltaY;
+            if (distance < nearestDistance) { nearest = candidate; nearestDistance = distance; }
+        }
+        if (nearest != current.cend() && nearestDistance <= 32 * 32) found = nearest;
+    }
+    const auto result = found != current.cend() ? invokeAutomationContextMenu(found->automationElement) : invokeAutomationContextMenu(requested.automationElement);
+    releaseAutomationItems(current);
+    if (restoreTaskbar && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
     return result;
 }
 
@@ -519,24 +593,37 @@ void enumerateToolbar(HWND toolbar, QVector<TrayModel::Item> &items)
 void enrichTrayItems(QVector<TrayModel::Item> &items, const QVector<TrayModel::Item> &native)
 {
     QSet<int> used;
-    for (auto &item : items) {
+    constexpr qint64 matchRadiusSquared = 32 * 32;
+    for (int itemIndex = 0; itemIndex < items.size(); ++itemIndex) {
+        auto &item = items[itemIndex];
         auto found = native.cend();
-        if (item.owner) found = std::find_if(native.cbegin(), native.cend(), [&item, &used, &native](const TrayModel::Item &candidate) { const auto index = static_cast<int>(&candidate - native.constData()); return !used.contains(index) && candidate.owner == item.owner && candidate.id == item.id && candidate.icon; });
-        if (found == native.cend() && !item.tooltip.isEmpty()) found = std::find_if(native.cbegin(), native.cend(), [&item, &used, &native](const TrayModel::Item &candidate) { const auto index = static_cast<int>(&candidate - native.constData()); return !used.contains(index) && candidate.icon && !candidate.tooltip.isEmpty() && candidate.tooltip.compare(item.tooltip, Qt::CaseInsensitive) == 0; });
+        if (item.owner) found = std::find_if(native.cbegin(), native.cend(), [&item, &used, &native](const TrayModel::Item &candidate) { const auto index = static_cast<int>(&candidate - native.constData()); return !used.contains(index) && candidate.owner == item.owner && candidate.id == item.id; });
         if (found == native.cend() && item.bounds.isValid()) {
-        qint64 bestDistance = 0;
-        const auto itemCenter = item.bounds.center();
-        for (auto candidate = native.cbegin(); candidate != native.cend(); ++candidate) {
-            const auto index = static_cast<int>(&*candidate - native.constData());
-            if (used.contains(index) || !candidate->icon || !candidate->bounds.isValid() || (!item.bounds.intersects(candidate->bounds) && !item.bounds.contains(candidate->bounds.center()) && !candidate->bounds.contains(itemCenter))) continue;
-            const auto deltaX = static_cast<qint64>(itemCenter.x()) - candidate->bounds.center().x();
-            const auto deltaY = static_cast<qint64>(itemCenter.y()) - candidate->bounds.center().y();
-            const auto distance = deltaX * deltaX + deltaY * deltaY;
-            if (found != native.cend() && distance >= bestDistance) continue;
-            found = candidate;
-            bestDistance = distance;
-        }
-        }
+            qint64 bestDistance = std::numeric_limits<qint64>::max();
+            QVector<int> nearest;
+            const auto itemCenter = item.bounds.center();
+            for (auto candidate = native.cbegin(); candidate != native.cend(); ++candidate) {
+                const auto index = static_cast<int>(&*candidate - native.constData());
+                if (used.contains(index) || !candidate->bounds.isValid()) continue;
+                const auto candidateCenter = candidate->bounds.center();
+                const auto deltaX = static_cast<qint64>(itemCenter.x()) - candidateCenter.x();
+                const auto deltaY = static_cast<qint64>(itemCenter.y()) - candidateCenter.y();
+                const auto distance = deltaX * deltaX + deltaY * deltaY;
+                if (!item.bounds.intersects(candidate->bounds) && distance > matchRadiusSquared) continue;
+                if (distance < bestDistance) { bestDistance = distance; nearest.clear(); }
+                if (distance == bestDistance) nearest.append(index);
+            }
+            if (nearest.size() == 1) found = native.cbegin() + nearest.front();
+            else if (!nearest.isEmpty() && !item.tooltip.isEmpty()) {
+                for (const auto index : nearest) {
+                    const auto candidate = native.cbegin() + index;
+                    if (candidate->tooltip.compare(item.tooltip, Qt::CaseInsensitive) != 0) continue;
+                    if (found != native.cend()) { found = native.cend(); break; }
+                    found = candidate;
+                }
+            }
+            if (nearest.isEmpty() && items.size() == native.size() && itemIndex < native.size() && !used.contains(itemIndex)) found = native.cbegin() + itemIndex;
+        } else if (found == native.cend() && items.size() == native.size() && itemIndex < native.size() && !used.contains(itemIndex)) found = native.cbegin() + itemIndex;
         if (found == native.cend()) continue;
         const auto index = static_cast<int>(&(*found) - native.constData());
         used.insert(index);
@@ -545,7 +632,7 @@ void enrichTrayItems(QVector<TrayModel::Item> &items, const QVector<TrayModel::I
         item.callback = found->callback;
         item.version = found->version;
         item.icon = found->icon;
-        if (!found->iconImage.isNull()) item.iconImage = found->iconImage;
+        if (!hasVisiblePixels(item.iconImage) && hasVisiblePixels(found->iconImage)) item.iconImage = found->iconImage;
     }
 }
 #endif
@@ -701,6 +788,8 @@ TrayModel::TrayModel(QObject *parent) : QAbstractListModel(parent)
         refresh();
         if (items.isEmpty()) QThread::msleep(100);
     }
+    SetPropW(traySpyWindow, L"Tasked.Debug.TrayRows", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(items.size() + 1)));
+    SetPropW(traySpyWindow, L"Tasked.Debug.TrayImages", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(xamlTrayImages.size() + 1)));
 }
 
 bool TrayModel::isOverflow(const QString &key) const { return overflowKeys.contains(key); }
@@ -804,8 +893,23 @@ void TrayModel::refresh()
     if (shell) tasked::trayhook::requestScan(shell);
     const auto visible = shell && IsWindowVisible(shell);
     QVector<Item> next = automationTrayItems();
+    const auto uiAutomationEmpty = next.isEmpty();
     QVector<Item> native = trayNotifyItems();
     for (const auto toolbar : trayToolbars()) enumerateToolbar(toolbar, native);
+    if (uiAutomationEmpty && !xamlTrayImageItems.isEmpty()) {
+        next.reserve(xamlTrayImageItems.size());
+        for (const auto &packet : xamlTrayImageItems) {
+            if (!hasVisiblePixels(packet.image)) continue;
+            Item item;
+            item.key = automationKey(packet.automationId, packet.name, packet.ordinal);
+            item.tooltip = packet.name;
+            item.automationId = packet.automationId;
+            item.ordinal = packet.ordinal;
+            item.iconImage = packet.image;
+            item.bounds = packet.bounds;
+            next.append(std::move(item));
+        }
+    }
     if (next.isEmpty()) {
         next = std::move(native);
         if (next.isEmpty() && !visible) {
@@ -828,45 +932,68 @@ void TrayModel::refresh()
         next = std::move(ordered);
     }
     applySavedOrder(next);
+    int exactImageMatches = 0;
+    int spatialImageMatches = 0;
+    QSet<int> usedXamlImages;
     for (auto &item : next) {
-        const auto old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.key == item.key; });
+        auto old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.key == item.key; });
+        if (old == items.cend() && !item.tooltip.isEmpty()) {
+            old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.automationElement && trayTextMatches(item.tooltip, candidate.tooltip); });
+        }
+        if (old == items.cend() && !item.automationId.isEmpty()) {
+            old = std::find_if(items.cbegin(), items.cend(), [&item](const Item &candidate) { return candidate.automationElement && candidate.automationId == item.automationId && candidate.ordinal == item.ordinal; });
+        }
         if (old != items.cend()) {
             if (!item.owner) { item.owner = old->owner; item.id = old->id; }
             if (!item.callback) item.callback = old->callback;
             if (!item.version) item.version = old->version;
             if (!item.icon) item.icon = old->icon;
-            if (item.iconImage.isNull()) item.iconImage = old->iconImage;
+            if (!item.automationElement && old->automationElement) {
+                item.automationElement = old->automationElement;
+                reinterpret_cast<IUIAutomationElement *>(item.automationElement)->AddRef();
+            }
+            if (!hasVisiblePixels(item.iconImage)) item.iconImage = old->iconImage;
         }
-        if (item.icon) {
-            auto image = trayIconImage(item.icon);
-            if (!image.isNull()) item.iconImage = std::move(image);
+        if (!hasVisiblePixels(item.iconImage)) item.iconImage = {};
+        auto exact = -1;
+        for (int index = 0; index < xamlTrayImageItems.size(); ++index) {
+            if (usedXamlImages.contains(index)) continue;
+            const auto &candidate = xamlTrayImageItems.at(index);
+            if (automationKey(candidate.automationId, candidate.name, candidate.ordinal) == item.key && hasVisiblePixels(candidate.image)) { exact = index; break; }
         }
-        const auto liveImage = xamlTrayImages.value(item.key);
-        if (!liveImage.isNull()) item.iconImage = liveImage;
-        else if (item.iconImage.isNull() && item.bounds.isValid()) {
+        if (exact >= 0) { item.iconImage = xamlTrayImageItems.at(exact).image; usedXamlImages.insert(exact); ++exactImageMatches; }
+        else if (item.bounds.isValid()) {
             const auto itemCenter = item.bounds.center();
-            auto nearest = xamlTrayImageItems.cend();
-            qint64 nearestDistance = 0;
-            for (auto candidate = xamlTrayImageItems.cbegin(); candidate != xamlTrayImageItems.cend(); ++candidate) {
-                const QPoint iconCenter(candidate->screen.x() + 8, candidate->screen.y() + 8);
-                const auto deltaX = static_cast<qint64>(itemCenter.x()) - iconCenter.x();
-                const auto deltaY = static_cast<qint64>(itemCenter.y()) - iconCenter.y();
+            auto nearest = -1;
+            qint64 nearestDistance = std::numeric_limits<qint64>::max();
+            constexpr qint64 matchRadiusPixels = 32;
+            constexpr qint64 matchRadiusSquared = matchRadiusPixels * matchRadiusPixels;
+            for (int index = 0; index < xamlTrayImageItems.size(); ++index) {
+                if (usedXamlImages.contains(index)) continue;
+                const auto &candidate = xamlTrayImageItems.at(index);
+                if (!candidate.bounds.isValid() || !hasVisiblePixels(candidate.image)) continue;
+                const auto candidateCenter = candidate.bounds.center();
+                const auto deltaX = static_cast<qint64>(itemCenter.x()) - candidateCenter.x();
+                const auto deltaY = static_cast<qint64>(itemCenter.y()) - candidateCenter.y();
                 const auto distance = deltaX * deltaX + deltaY * deltaY;
-                if (!item.bounds.contains(iconCenter) && distance > 256) continue;
-                if (nearest != xamlTrayImageItems.cend() && distance >= nearestDistance) continue;
-                nearest = candidate;
+                if (!item.bounds.intersects(candidate.bounds) && distance > matchRadiusSquared) continue;
+                if (nearest >= 0 && distance >= nearestDistance) continue;
+                nearest = index;
                 nearestDistance = distance;
             }
-            if (nearest != xamlTrayImageItems.cend()) item.iconImage = nearest->image;
+            if (nearest >= 0) { item.iconImage = xamlTrayImageItems.at(nearest).image; usedXamlImages.insert(nearest); ++spatialImageMatches; }
         }
     }
+    SetPropW(traySpyWindow, L"Tasked.Debug.TrayExact", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(exactImageMatches + 1)));
+    SetPropW(traySpyWindow, L"Tasked.Debug.TraySpatial", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(spatialImageMatches + 1)));
     QHash<qulonglong, QImage> nextIconImages;
     for (const auto &item : next) {
         if (!item.iconImage.isNull()) nextIconImages.insert(item.key, item.iconImage);
     }
+    SetPropW(traySpyWindow, L"Tasked.Debug.TrayMappedIcons", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(nextIconImages.size() + 1)));
     if (next.size() == items.size()) {
         bool same = true;
-        for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).owner != items.at(i).owner || next.at(i).id != items.at(i).id || next.at(i).callback != items.at(i).callback || next.at(i).version != items.at(i).version || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).iconImage != items.at(i).iconImage) { same = false; break; }
+        for (int i = 0; i < next.size(); ++i) if (next.at(i).key != items.at(i).key || next.at(i).owner != items.at(i).owner || next.at(i).id != items.at(i).id || next.at(i).callback != items.at(i).callback || next.at(i).version != items.at(i).version || next.at(i).icon != items.at(i).icon || next.at(i).tooltip != items.at(i).tooltip || next.at(i).automationId != items.at(i).automationId || next.at(i).automationElement != items.at(i).automationElement || next.at(i).iconImage != items.at(i).iconImage) { same = false; break; }
         if (same) {
             releaseAutomationItems(next);
             return;
@@ -882,6 +1009,8 @@ void TrayModel::refresh()
     ++imageRevision;
     endResetModel();
     emit iconRevisionChanged();
+    SetPropW(traySpyWindow, L"Tasked.Debug.TrayRows", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(items.size() + 1)));
+    SetPropW(traySpyWindow, L"Tasked.Debug.TrayImages", reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(xamlTrayImages.size() + 1)));
 #endif
 }
 
@@ -908,7 +1037,9 @@ void TrayModel::showContextMenu(const QString &key, int x, int y)
     bool ok = false;
     const auto value = key.toULongLong(&ok);
     const auto found = std::find_if(items.cbegin(), items.cend(), [value](const Item &item) { return item.key == value; });
-    if (!ok || found == items.cend() || !found->owner || !found->callback) return;
+    if (!ok || found == items.cend()) return;
+    if (showAutomationContextMenu(*found)) return;
+    if (!found->owner || !found->callback) return;
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
     if (!IsWindow(owner)) return;
     DWORD processId = 0;
@@ -940,9 +1071,10 @@ void TrayModel::activate(const QString &key, int action)
     const auto value = key.toULongLong(&ok);
     const auto found = std::find_if(items.cbegin(), items.cend(), [value](const Item &item) { return item.key == value; });
     if (!ok || found == items.cend()) return;
-    if (found->automationElement) {
-        if (action == 1) { POINT point{}; GetCursorPos(&point); showContextMenu(key, point.x, point.y); return; }
-        if (action == 3 || invokeAutomationItem(found->automationElement)) return;
+    if (action == 1) {
+        if (showAutomationContextMenu(*found)) return;
+    } else if (found->automationElement && (action == 3 || invokeAutomationItem(found->automationElement))) {
+        return;
     }
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
     if (!IsWindow(owner)) return;

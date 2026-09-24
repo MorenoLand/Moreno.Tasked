@@ -148,7 +148,7 @@ private:
     int label = 9;
     int clockFont = 20;
     int icon = 42;
-    int trayIcon = 16;
+    int trayIcon = 24;
     int trayScaleValue = 100;
     int opacity = 100;
     int background = 100;

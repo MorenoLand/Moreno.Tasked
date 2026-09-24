@@ -63,7 +63,7 @@ Window {
     property int leftWidth: verticalDock ? (visibleButtonCount > 0 ? dockSectionHeight : 0) : (visibleButtonCount > 0 ? buttonWidth * visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount - 1) * 8 + dockSidePadding * 2 : 0)
     property int leftHeight: verticalDock ? (visibleButtonCount > 0 ? Math.max(dockSectionHeight, visibleButtonCount * dockSectionHeight + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) + Math.max(0, visibleButtonCount + (dividerOneVisible ? 1 : 0) + (dividerTwoVisible ? 1 : 0) - 1) * 8 + dockSidePadding * 2) : 0) : dockSectionHeight
     property int clockWidth: clockEnabled ? Math.max(clock24Hour ? (secondsEnabled ? 112 : 88) : (secondsEnabled ? 134 : 110), Math.round(clockSize * (secondsEnabled ? (clock24Hour ? 5.2 : 6.6) : (clock24Hour ? 3.8 : 5.2)) + 8)) : 0
-    property int trayPixelSize: Math.max(12, Math.round(trayIconSize * trayScale))
+    property int trayPixelSize: Math.max(16, Math.round(trayIconSize * trayScale))
     property int trayCellSize: trayPixelSize + 4
     property int trayFlowSpacing: 3
     property int overflowButtonWidth: trayEnabled ? trayCellSize : 0

@@ -27,7 +27,7 @@ TaskedSettings::TaskedSettings(QObject *parent) : QObject(parent)
     label = settings.value("typography/labelSize", 9).toInt();
     clockFont = settings.value("typography/clockSize", 20).toInt();
     icon = settings.value("typography/iconSize", 42).toInt();
-    trayIcon = settings.value("typography/trayIconSize", 16).toInt();
+    trayIcon = settings.value("typography/trayIconSize", 24).toInt();
     trayScaleValue = settings.value("typography/trayScale", 100).toInt();
     opacity = settings.value("style/surfaceOpacity", 100).toInt();
     background = settings.value("style/backgroundOpacity", 100).toInt();
@@ -104,7 +104,7 @@ void TaskedSettings::setFontFamily(const QString &value) { if (value.isEmpty() |
 void TaskedSettings::setLabelSize(int value) { value = qBound(8, value, 16); if (label == value) return; label = value; QSettings().setValue("typography/labelSize", label); emit labelSizeChanged(); }
 void TaskedSettings::setClockSize(int value) { value = qBound(16, value, 28); if (clockFont == value) return; clockFont = value; QSettings().setValue("typography/clockSize", clockFont); emit clockSizeChanged(); }
 void TaskedSettings::setIconSize(int value) { value = qBound(34, value, 50); if (icon == value) return; icon = value; QSettings().setValue("typography/iconSize", icon); emit iconSizeChanged(); }
-void TaskedSettings::setTrayIconSize(int value) { value = qBound(12, value, 24); if (trayIcon == value) return; trayIcon = value; QSettings().setValue("typography/trayIconSize", trayIcon); emit trayIconSizeChanged(); }
+void TaskedSettings::setTrayIconSize(int value) { value = qBound(16, value, 28); if (trayIcon == value) return; trayIcon = value; QSettings().setValue("typography/trayIconSize", trayIcon); emit trayIconSizeChanged(); }
 void TaskedSettings::setTrayScale(int value) { value = qBound(80, value, 130); if (trayScaleValue == value) return; trayScaleValue = value; QSettings().setValue("typography/trayScale", trayScaleValue); emit trayScaleChanged(); }
 void TaskedSettings::setSurfaceOpacity(int value) { value = qBound(70, value, 100); if (opacity == value) return; opacity = value; QSettings().setValue("style/surfaceOpacity", opacity); emit surfaceOpacityChanged(); }
 void TaskedSettings::setBackgroundOpacity(int value) { value = qBound(0, value, 100); if (background == value) return; background = value; QSettings().setValue("style/backgroundOpacity", background); emit backgroundOpacityChanged(); }
@@ -112,6 +112,6 @@ void TaskedSettings::setCornerRadius(int value) { value = qBound(10, value, 32);
 void TaskedSettings::setShadowStyle(int value) { value = qBound(0, value, 2); if (shadow == value) return; shadow = value; QSettings().setValue("style/shadowStyle", shadow); emit shadowStyleChanged(); }
 void TaskedSettings::reset()
 {
-    setSplitMode(false); setSpacedMode(true); setDockLocked(true); setDockPosition(0); setSectionOffset("left", 0, 0); setSectionOffset("middle", 0, 0); setSectionOffset("tray", 0, 0); setSectionOffset("clock", 0, 0); setSearchEnabled(false); setClockEnabled(true); setClock24Hour(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setPreviewsEnabled(true); setAnimationsEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(16); setTrayScale(100); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22); setShadowStyle(0);
+    setSplitMode(false); setSpacedMode(true); setDockLocked(true); setDockPosition(0); setSectionOffset("left", 0, 0); setSectionOffset("middle", 0, 0); setSectionOffset("tray", 0, 0); setSectionOffset("clock", 0, 0); setSearchEnabled(false); setClockEnabled(true); setClock24Hour(true); setSecondsEnabled(false); setDividersEnabled(true); setTaskButtonEnabled(true); setStartButtonEnabled(true); setLabelsEnabled(true); setTrayEnabled(true); setTrayWrapEnabled(true); setTrayScrollEnabled(false); setPreviewsEnabled(true); setAnimationsEnabled(true); setTheme(0); setFontFamily("Segoe UI"); setLabelSize(9); setClockSize(20); setIconSize(42); setTrayIconSize(24); setTrayScale(100); setSurfaceOpacity(100); setBackgroundOpacity(100); setCornerRadius(22); setShadowStyle(0);
     emit sectionOffsetsChanged();
 }

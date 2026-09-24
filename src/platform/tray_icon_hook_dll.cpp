@@ -31,14 +31,17 @@ namespace xaml = winrt::Windows::UI::Xaml;
 namespace streams = winrt::Windows::Storage::Streams;
 using tasked::trayhook::IconPacketHeader;
 using tasked::trayhook::SharedRequest;
+using tasked::trayhook::iconPacketKind;
+using tasked::trayhook::maxIconPixelBytes;
+using tasked::trayhook::maxIconSide;
+using tasked::trayhook::scanCompletePacketKind;
 struct ScanRequest { DWORD hostPid; HWND targetWindow; std::uint32_t generation; SharedRequest shared; };
 struct IconPacket { std::vector<std::uint8_t> bytes; };
-struct TrayItem { xaml::FrameworkElement view{nullptr}; xaml::FrameworkElement content{nullptr}; std::string automationId; std::string name; POINT screen{}; std::uint32_t ordinal{}; };
+struct ScanCapture { std::vector<IconPacket> packets; bool complete = false; };
+struct TrayItem { xaml::FrameworkElement view{nullptr}; xaml::FrameworkElement content{nullptr}; std::string automationId; std::string name; RECT screenBounds{}; std::uint32_t ordinal{}; };
 volatile LONG scanActive = 0;
 constexpr std::size_t maxTreeNodes = 16384;
 constexpr std::size_t maxStringBytes = 2048;
-constexpr std::uint32_t maxIconSide = 512;
-constexpr std::uint32_t maxPixelBytes = 1024 * 1024;
 constexpr DWORD sendTimeoutMs = 250;
 
 UINT ScanMessage() noexcept
@@ -254,24 +257,28 @@ std::vector<xaml::FrameworkElement> FindIconContent(const xaml::FrameworkElement
     return found;
 }
 
-bool ToScreenPoint(const xaml::FrameworkElement& view, const xaml::FrameworkElement& root, const xaml::XamlRoot& xamlRoot, HWND taskbarWindow, POINT* screen)
+bool ToScreenRect(const xaml::FrameworkElement& view, const xaml::FrameworkElement& root, const xaml::XamlRoot& xamlRoot, HWND taskbarWindow, RECT* screenBounds)
 {
-    if (!screen) return false;
+    if (!screenBounds) return false;
     POINT origin{};
     if (!ClientToScreen(taskbarWindow, &origin)) return false;
     const auto point = view.TransformToVisual(root).TransformPoint({0.0, 0.0});
     const double scale = xamlRoot.RasterizationScale();
     const double x = origin.x + point.X * scale;
     const double y = origin.y + point.Y * scale;
-    if (!std::isfinite(x) || !std::isfinite(y) || x < std::numeric_limits<LONG>::min() || x > std::numeric_limits<LONG>::max() || y < std::numeric_limits<LONG>::min() || y > std::numeric_limits<LONG>::max()) return false;
-    screen->x = static_cast<LONG>(std::lround(x));
-    screen->y = static_cast<LONG>(std::lround(y));
+    const double width = view.ActualWidth() * scale;
+    const double height = view.ActualHeight() * scale;
+    const double right = x + width;
+    const double bottom = y + height;
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(width) || !std::isfinite(height) || !std::isfinite(right) || !std::isfinite(bottom) || width <= 0.0 || height <= 0.0 || x < std::numeric_limits<LONG>::min() || x > std::numeric_limits<LONG>::max() || y < std::numeric_limits<LONG>::min() || y > std::numeric_limits<LONG>::max() || right < std::numeric_limits<LONG>::min() || right > std::numeric_limits<LONG>::max() || bottom < std::numeric_limits<LONG>::min() || bottom > std::numeric_limits<LONG>::max()) return false;
+    *screenBounds = RECT{static_cast<LONG>(std::lround(x)), static_cast<LONG>(std::lround(y)), static_cast<LONG>(std::lround(right)), static_cast<LONG>(std::lround(bottom))};
+    if (screenBounds->right <= screenBounds->left || screenBounds->bottom <= screenBounds->top) return false;
     return true;
 }
 
 bool ValidText(const std::string& value) noexcept
 {
-    return value.size() <= maxStringBytes && value.find('\0') == std::string::npos;
+    return value.size() <= tasked::trayhook::maxPacketTextBytes && value.find('\0') == std::string::npos;
 }
 
 bool BuildPacket(const TrayItem& item, std::uint32_t generation, std::uint32_t width, std::uint32_t height, const std::vector<std::uint8_t>& pixels, IconPacket* packet)
@@ -279,7 +286,7 @@ bool BuildPacket(const TrayItem& item, std::uint32_t generation, std::uint32_t w
     if (!packet || !width || !height || width > maxIconSide || height > maxIconSide || item.automationId.empty() && item.name.empty() || !ValidText(item.automationId) || !ValidText(item.name)) return false;
     const std::uint64_t stride = static_cast<std::uint64_t>(width) * 4;
     const std::uint64_t pixelBytes = stride * height;
-    if (stride > std::numeric_limits<std::uint32_t>::max() || pixelBytes > maxPixelBytes || pixels.size() != pixelBytes) return false;
+    if (stride > std::numeric_limits<std::uint32_t>::max() || pixelBytes > maxIconPixelBytes || pixels.size() != pixelBytes) return false;
     const std::uint64_t total = sizeof(IconPacketHeader) + item.automationId.size() + item.name.size() + pixelBytes;
     if (total > std::numeric_limits<DWORD>::max()) return false;
     IconPacketHeader header{};
@@ -289,12 +296,15 @@ bool BuildPacket(const TrayItem& item, std::uint32_t generation, std::uint32_t w
     header.automationIdLength = static_cast<std::uint32_t>(item.automationId.size());
     header.nameLength = static_cast<std::uint32_t>(item.name.size());
     header.ordinal = item.ordinal;
-    header.screenX = item.screen.x;
-    header.screenY = item.screen.y;
+    header.screenX = item.screenBounds.left;
+    header.screenY = item.screenBounds.top;
+    header.screenWidth = static_cast<std::uint32_t>(item.screenBounds.right - item.screenBounds.left);
+    header.screenHeight = static_cast<std::uint32_t>(item.screenBounds.bottom - item.screenBounds.top);
     header.width = width;
     header.height = height;
     header.stride = static_cast<std::uint32_t>(stride);
     header.pixelBytes = static_cast<std::uint32_t>(pixelBytes);
+    header.packetKind = iconPacketKind;
     packet->bytes.resize(static_cast<std::size_t>(total));
     auto* output = packet->bytes.data();
     std::memcpy(output, &header, sizeof(header));
@@ -307,9 +317,15 @@ bool BuildPacket(const TrayItem& item, std::uint32_t generation, std::uint32_t w
     return true;
 }
 
-winrt::Windows::Foundation::IAsyncAction CaptureIconsAsync(ScanRequest request, const std::shared_ptr<std::vector<IconPacket>>& output)
+bool HasVisiblePixels(const std::vector<std::uint8_t>& pixels) noexcept
 {
-    auto& packets = *output;
+    for (std::size_t index = 3; index < pixels.size(); index += 4) if (pixels[index]) return true;
+    return false;
+}
+
+winrt::Windows::Foundation::IAsyncAction CaptureIconsAsync(ScanRequest request, const std::shared_ptr<ScanCapture>& output)
+{
+    auto& packets = output->packets;
     HWND taskbarWindow = FindTaskbarWindow();
     if (!taskbarWindow) co_return;
     const auto xamlRoot = GetTaskbarXamlRoot(taskbarWindow, request.shared);
@@ -335,62 +351,88 @@ winrt::Windows::Foundation::IAsyncAction CaptureIconsAsync(ScanRequest request, 
     std::set<void*> contentObjects;
     for (const auto& view : views) {
         auto contents = FindIconContent(view);
-        if (contents.size() != 1 || !contentObjects.insert(winrt::get_abi(contents.front())).second) continue;
+        if (contents.size() != 1) continue;
+        if (!contentObjects.insert(winrt::get_abi(contents.front())).second) continue;
         auto id = winrt::to_string(xaml::Automation::AutomationProperties::GetAutomationId(view));
         auto name = winrt::to_string(xaml::Automation::AutomationProperties::GetName(view));
         if (name.empty()) name = winrt::to_string(view.Name());
         if ((id.empty() && name.empty()) || !ValidText(id) || !ValidText(name)) continue;
-        POINT screen{};
-        if (!ToScreenPoint(view, root, xamlRoot, taskbarWindow, &screen)) continue;
-        items.push_back(TrayItem{view, contents.front(), std::move(id), std::move(name), screen, 0});
+        RECT screenBounds{};
+        if (!ToScreenRect(view, root, xamlRoot, taskbarWindow, &screenBounds)) continue;
+        items.push_back(TrayItem{view, contents.front(), std::move(id), std::move(name), screenBounds, 0});
     }
+    if (items.size() > tasked::trayhook::maxTrayItems) co_return;
     std::map<std::pair<std::string, std::string>, std::uint32_t> ordinals;
     for (auto& item : items) item.ordinal = ordinals[{item.automationId, item.name}]++;
+    bool complete = true;
     for (const auto& item : items) {
         try {
-            if (item.content.Visibility() != xaml::Visibility::Visible || item.content.ActualWidth() <= 0.0 || item.content.ActualHeight() <= 0.0) continue;
+            if (item.content.Visibility() != xaml::Visibility::Visible || item.content.ActualWidth() <= 0.0 || item.content.ActualHeight() <= 0.0) { complete = false; break; }
             xaml::Media::Imaging::RenderTargetBitmap bitmap;
             co_await bitmap.RenderAsync(item.content);
             const auto width = bitmap.PixelWidth();
             const auto height = bitmap.PixelHeight();
-            if (width <= 0 || height <= 0 || static_cast<std::uint32_t>(width) > maxIconSide || static_cast<std::uint32_t>(height) > maxIconSide) continue;
+            if (width <= 0 || height <= 0 || static_cast<std::uint32_t>(width) > maxIconSide || static_cast<std::uint32_t>(height) > maxIconSide) { complete = false; break; }
             const std::uint64_t expected = static_cast<std::uint64_t>(width) * static_cast<std::uint64_t>(height) * 4;
-            if (!expected || expected > maxPixelBytes) continue;
+            if (!expected || expected > maxIconPixelBytes) { complete = false; break; }
             const auto buffer = co_await bitmap.GetPixelsAsync();
-            if (!buffer || buffer.Length() != expected) continue;
+            if (!buffer || buffer.Length() != expected) { complete = false; break; }
             auto reader = streams::DataReader::FromBuffer(buffer);
             std::vector<std::uint8_t> pixels(static_cast<std::size_t>(expected));
             reader.ReadBytes(winrt::array_view<std::uint8_t>(pixels.data(), pixels.data() + pixels.size()));
+            if (!HasVisiblePixels(pixels)) continue;
             IconPacket packet;
-            if (BuildPacket(item, request.generation, static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height), pixels, &packet)) packets.push_back(std::move(packet));
-        } catch (...) {}
+            if (!BuildPacket(item, request.generation, static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height), pixels, &packet)) { complete = false; break; }
+            packets.push_back(std::move(packet));
+        } catch (...) { complete = false; break; }
     }
+    output->complete = complete;
 }
 
-void SendPackets(const ScanRequest& request, const std::vector<IconPacket>& packets) noexcept
+bool SendPackets(const ScanRequest& request, const std::vector<IconPacket>& packets) noexcept
 {
     DWORD pid = 0;
-    if (!IsWindow(request.targetWindow) || !GetWindowThreadProcessId(request.targetWindow, &pid) || pid != request.hostPid) return;
+    if (!IsWindow(request.targetWindow) || !GetWindowThreadProcessId(request.targetWindow, &pid) || pid != request.hostPid) return false;
     for (const auto& packet : packets) {
-        if (packet.bytes.empty() || packet.bytes.size() > std::numeric_limits<DWORD>::max()) continue;
+        if (packet.bytes.empty() || packet.bytes.size() > std::numeric_limits<DWORD>::max()) return false;
         COPYDATASTRUCT data{};
         data.dwData = tasked::trayhook::copyDataTag;
         data.cbData = static_cast<DWORD>(packet.bytes.size());
         data.lpData = const_cast<std::uint8_t*>(packet.bytes.data());
         DWORD_PTR response = 0;
-        SendMessageTimeoutW(request.targetWindow, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data), SMTO_ABORTIFHUNG | SMTO_BLOCK, sendTimeoutMs, &response);
+        if (!SendMessageTimeoutW(request.targetWindow, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data), SMTO_ABORTIFHUNG | SMTO_BLOCK, sendTimeoutMs, &response) || !response) return false;
     }
+    return true;
+}
+
+bool SendScanComplete(const ScanRequest& request, std::uint32_t packetCount) noexcept
+{
+    DWORD pid = 0;
+    if (!IsWindow(request.targetWindow) || !GetWindowThreadProcessId(request.targetWindow, &pid) || pid != request.hostPid) return false;
+    IconPacketHeader header{};
+    header.magic = tasked::trayhook::packetMagic;
+    header.version = tasked::trayhook::protocolVersion;
+    header.requestId = request.generation;
+    header.packetKind = scanCompletePacketKind;
+    header.expectedPacketCount = packetCount;
+    COPYDATASTRUCT data{};
+    data.dwData = tasked::trayhook::copyDataTag;
+    data.cbData = sizeof(header);
+    data.lpData = &header;
+    DWORD_PTR response = 0;
+    return SendMessageTimeoutW(request.targetWindow, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data), SMTO_ABORTIFHUNG | SMTO_BLOCK, sendTimeoutMs, &response) != 0;
 }
 
 winrt::fire_and_forget RunScanAsync(ScanRequest request)
 {
     struct ScanRelease { ~ScanRelease() { InterlockedExchange(&scanActive, 0); } } release;
+    auto capture = std::make_shared<ScanCapture>();
     try {
-        auto packets = std::make_shared<std::vector<IconPacket>>();
-        co_await CaptureIconsAsync(request, packets);
-        co_await winrt::resume_background();
-        SendPackets(request, *packets);
-    } catch (...) {}
+        co_await CaptureIconsAsync(request, capture);
+    } catch (...) { capture->complete = false; }
+    if (!capture->complete) co_return;
+    co_await winrt::resume_background();
+    if (capture->packets.size() <= std::numeric_limits<std::uint32_t>::max() && SendPackets(request, capture->packets)) SendScanComplete(request, static_cast<std::uint32_t>(capture->packets.size()));
 }
 
 bool ReadRequest(WPARAM hostPidValue, LPARAM generationValue, ScanRequest* result) noexcept
