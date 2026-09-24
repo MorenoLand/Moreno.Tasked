@@ -80,6 +80,9 @@ private:
     QStringList taskbarOrder;
     QVector<Item> items;
     QTimer timer;
+    QTimer pinRefreshTimer;
+    quintptr pendingTaskbarElement = 0;
+    int pinRefreshTicks = 0;
 };
 
 class TrayModel final : public QAbstractListModel
