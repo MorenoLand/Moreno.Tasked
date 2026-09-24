@@ -150,8 +150,8 @@ Window {
     Timer { id: trayDrawerCloseTimer; interval: 220; onTriggered: trayOverflowWindow.close() }
     onPreviewsEnabledChanged: if (!previewsEnabled) root.closePreview()
     onClockFormatChanged: root.clock = Qt.formatTime(new Date(), root.clockFormat)
-    onPreferredDockWidthChanged: if (!verticalDock && width !== preferredDockWidth) width = preferredDockWidth
-    onPreferredDockHeightChanged: if (verticalDock && height !== preferredDockHeight) height = preferredDockHeight
+    Behavior on width { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
+    Behavior on height { NumberAnimation { duration: root.animationDuration; easing.type: Easing.InOutCubic } }
 
     Connections {
         target: taskedSettings
