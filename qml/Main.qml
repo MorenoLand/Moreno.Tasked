@@ -48,8 +48,8 @@ Window {
     property int cornerRadius: taskedSettings.cornerRadius
     property int shadowStyle: taskedSettings.shadowStyle
     property color accentColor: theme === 1 ? "#58D3E8" : theme === 2 ? "#C28CFF" : "#6D8DF4"
-    property color surfaceColor: theme === 1 ? "#C8124B5C" : theme === 2 ? "#C82B1D55" : "#C815244E"
-    property color sectionColor: theme === 1 ? "#C8124B5C" : theme === 2 ? "#C82B1D55" : "#C815244E"
+    property color surfaceColor: theme === 1 ? "#8A173D5A" : theme === 2 ? "#8A2A1D62" : "#8A152444"
+    property color sectionColor: theme === 1 ? "#7A173D5A" : theme === 2 ? "#7A2A1D62" : "#7A152444"
     property color surfaceBackgroundColor: Qt.rgba(surfaceColor.r, surfaceColor.g, surfaceColor.b, surfaceColor.a * dockOpacity * backgroundOpacity)
     property color sectionBackgroundColor: Qt.rgba(sectionColor.r, sectionColor.g, sectionColor.b, sectionColor.a * dockOpacity * backgroundOpacity)
     property color iconSurfaceColor: "transparent"
@@ -155,12 +155,29 @@ Window {
             radius: parent.glassRadius
             color: "transparent"
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.18)
+            border.color: Qt.rgba(1, 1, 1, 0.22)
             gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.18) }
-                GradientStop { position: 0.14; color: Qt.rgba(1, 1, 1, 0.07) }
-                GradientStop { position: 0.52; color: Qt.rgba(1, 1, 1, 0.012) }
-                GradientStop { position: 1.0; color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.06) }
+                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.22) }
+                GradientStop { position: 0.08; color: Qt.rgba(1, 1, 1, 0.10) }
+                GradientStop { position: 0.42; color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.045) }
+                GradientStop { position: 0.76; color: Qt.rgba(1, 1, 1, 0.018) }
+                GradientStop { position: 1.0; color: Qt.rgba(0.01, 0.03, 0.10, 0.18) }
+            }
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 2
+                radius: Math.max(0, parent.radius - 2)
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.08)
+            }
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 1
+                width: Math.max(24, parent.width * 0.72)
+                height: 1
+                color: Qt.rgba(1, 1, 1, 0.20)
             }
         }
     }
@@ -264,7 +281,9 @@ Window {
                         anchors.top: parent.top
                         anchors.topMargin: root.buttonIconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
-                        color: "transparent"
+                        color: Qt.rgba(0.16, 0.25, 0.45, 0.12)
+                        border.width: 1
+                        border.color: taskMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(1, 1, 1, 0.07)
                         scale: taskMouse.containsMouse ? 1.1 : 1
                         Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                         Image { id: taskedImage; anchors.fill: parent; anchors.margins: 5; source: "qrc:/Tasked-icon.png"; fillMode: Image.PreserveAspectFit; smooth: true }
@@ -288,7 +307,9 @@ Window {
                         anchors.top: parent.top
                         anchors.topMargin: root.iconTopMargin
                         radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
-                        color: root.iconSurfaceColor
+                        color: Qt.rgba(0.16, 0.25, 0.45, 0.12)
+                        border.width: 1
+                        border.color: searchMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(1, 1, 1, 0.07)
                         scale: searchMouse.containsMouse ? 1.1 : 1
                         Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
                         Text { anchors.centerIn: parent; text: "⌕"; color: "#F3F6FF"; font.family: root.fontFamily; font.pixelSize: Math.max(20, Math.round(root.iconSize * 0.55)) }
@@ -354,7 +375,9 @@ Window {
                             anchors.top: parent.top
                             anchors.topMargin: root.iconTopMargin
                             radius: Math.min(16, Math.max(10, Math.round(root.iconSize * 0.28)))
-                            color: root.iconSurfaceColor
+                            color: runningMouse.containsMouse ? Qt.rgba(0.35, 0.48, 0.80, 0.22) : Qt.rgba(0.16, 0.25, 0.45, 0.12)
+                            border.width: 1
+                            border.color: runningMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(1, 1, 1, 0.07)
                             opacity: runningMouse.containsMouse ? 1 : 0.94
                             scale: runningMouse.containsMouse ? 1.1 : 1
                             Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
@@ -419,7 +442,18 @@ Window {
                     opacity: root.trayDragActive && index === root.trayDragSource ? 0 : 1
                     transform: Translate { x: root.trayShift(index).x; y: root.trayShift(index).y }
                     Behavior on scale { NumberAnimation { duration: root.fastAnimationDuration; easing.type: Easing.OutCubic } }
-                    Rectangle { anchors.centerIn: parent; width: root.trayCellSize; height: root.trayCellSize; radius: 7; color: root.iconSurfaceColor }
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: root.trayCellSize
+                        height: root.trayCellSize
+                        radius: 7
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
+                            GradientStop { position: 1.0; color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.045) }
+                        }
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.08)
+                    }
                     Image { id: trayImage; anchors.centerIn: parent; width: root.trayPixelSize; height: root.trayPixelSize; source: "image://tray/" + model.key + "?revision=" + trayIcons.iconRevision; fillMode: Image.PreserveAspectFit; smooth: true; opacity: 1 }
                     MouseArea {
                         id: trayMouse
@@ -462,7 +496,16 @@ Window {
                         anchors.left: root.verticalDock ? undefined : parent.left
                         anchors.top: root.verticalDock || root.trayWrapEnabled ? parent.top : undefined
                         anchors.verticalCenter: !root.verticalDock && !root.trayWrapEnabled ? parent.verticalCenter : undefined
-                        Rectangle { anchors.fill: parent; radius: 8; color: root.iconSurfaceColor; border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.08) }
+                        Rectangle {
+                             anchors.fill: parent
+                             radius: 8
+                             gradient: Gradient {
+                                 GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
+                                 GradientStop { position: 1.0; color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.045) }
+                             }
+                             border.width: 1
+                             border.color: Qt.rgba(1, 1, 1, 0.08)
+                         }
                         Text { anchors.centerIn: parent; text: "⌃"; color: root.accentColor; font.family: root.fontFamily; font.pixelSize: 13; font.bold: true }
                         HoverHandler { onHoveredChanged: if (hovered) { trayDrawerCloseTimer.stop(); trayOverflowWindow.openPanel() } else trayDrawerCloseTimer.restart() }
                         MouseArea { anchors.fill: parent; onClicked: { trayDrawerCloseTimer.stop(); trayOverflowWindow.togglePanel() } }

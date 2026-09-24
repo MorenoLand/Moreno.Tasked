@@ -153,5 +153,5 @@ private:
     int opacity = 100;
     int background = 100;
     int radius = 22;
-    int shadow = 0;
+    int shadow = 1;
 };
