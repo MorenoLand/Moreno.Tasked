@@ -452,40 +452,114 @@ bool invokeAutomationContextMenu(quintptr elementPointer)
     return result;
 }
 
-bool showAutomationContextMenu(const TrayModel::Item &requested)
+struct VisibleWindowContext { QSet<HWND> *windows = nullptr; };
+BOOL CALLBACK collectVisibleWindow(HWND window, LPARAM parameter)
 {
-    if (requested.automationElement && invokeAutomationContextMenu(requested.automationElement)) return true;
-    const auto shell = realTrayWindow();
-    const auto restoreTaskbar = shell && !IsWindowVisible(shell);
-    if (restoreTaskbar) {
-        ShowWindow(shell, SW_SHOW);
-        Sleep(150);
-    }
-    auto current = automationTrayItems();
-    auto found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && candidate.key == requested.key; });
-    if (found == current.cend() && !requested.tooltip.isEmpty()) {
-        found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && trayTextMatches(candidate.tooltip, requested.tooltip); });
-    }
-    if (found == current.cend() && !requested.automationId.isEmpty()) {
-        found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && candidate.automationId == requested.automationId && candidate.ordinal == requested.ordinal; });
-    }
-    if (found == current.cend() && requested.bounds.isValid()) {
-        const auto requestedCenter = requested.bounds.center();
-        auto nearest = current.cend();
-        qint64 nearestDistance = std::numeric_limits<qint64>::max();
-        for (auto candidate = current.cbegin(); candidate != current.cend(); ++candidate) {
-            if (!candidate->automationElement || !candidate->bounds.isValid()) continue;
-            const auto candidateCenter = candidate->bounds.center();
-            const auto deltaX = static_cast<qint64>(requestedCenter.x()) - candidateCenter.x();
-            const auto deltaY = static_cast<qint64>(requestedCenter.y()) - candidateCenter.y();
-            const auto distance = deltaX * deltaX + deltaY * deltaY;
-            if (distance < nearestDistance) { nearest = candidate; nearestDistance = distance; }
+    auto *context = reinterpret_cast<VisibleWindowContext *>(parameter);
+    if (IsWindowVisible(window)) context->windows->insert(window);
+    return TRUE;
+}
+
+QSet<HWND> visibleWindows()
+{
+    QSet<HWND> result;
+    VisibleWindowContext context{ &result };
+    EnumWindows(collectVisibleWindow, reinterpret_cast<LPARAM>(&context));
+    return result;
+}
+
+bool isPopupWindow(HWND window)
+{
+    if (!window || window == traySpyWindow || window == realTrayWindow()) return false;
+    const auto style = GetWindowLongPtrW(window, GWL_STYLE);
+    const auto extendedStyle = GetWindowLongPtrW(window, GWL_EXSTYLE);
+    return (style & WS_POPUP) || (extendedStyle & WS_EX_TOOLWINDOW) || GetWindow(window, GW_OWNER);
+}
+
+struct PopupSearchContext { const QSet<HWND> *before = nullptr; HWND result = nullptr; };
+BOOL CALLBACK findNewPopupWindow(HWND window, LPARAM parameter)
+{
+    auto &context = *reinterpret_cast<PopupSearchContext *>(parameter);
+    if (!IsWindowVisible(window) || context.before->contains(window) || !isPopupWindow(window)) return TRUE;
+    context.result = window;
+    return FALSE;
+}
+
+HWND findContextPopup(const QSet<HWND> &before)
+{
+    const auto foreground = GetForegroundWindow();
+    const auto lastPopup = GetLastActivePopup(foreground);
+    if (lastPopup && lastPopup != foreground && IsWindowVisible(lastPopup) && isPopupWindow(lastPopup) && (!before.contains(lastPopup) || GetWindow(lastPopup, GW_OWNER))) return lastPopup;
+    PopupSearchContext context{ &before };
+    EnumWindows(findNewPopupWindow, reinterpret_cast<LPARAM>(&context));
+    return context.result;
+}
+
+void positionContextPopup(HWND popup, const POINT &anchor)
+{
+    RECT rect{};
+    if (!popup || !GetWindowRect(popup, &rect)) return;
+    const auto width = rect.right - rect.left;
+    const auto height = rect.bottom - rect.top;
+    if (width <= 0 || height <= 0) return;
+    MONITORINFO monitor{ sizeof(monitor) };
+    const auto monitorHandle = MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST);
+    if (!GetMonitorInfoW(monitorHandle, &monitor)) return;
+    const auto work = monitor.rcWork;
+    const auto centerY = (work.top + work.bottom) / 2;
+    auto x = anchor.x - width / 2;
+    auto y = anchor.y > centerY ? anchor.y - height - 10 : anchor.y + 10;
+    x = (std::max)(work.left + 8, (std::min)(x, work.right - width - 8));
+    y = (std::max)(work.top + 8, (std::min)(y, work.bottom - height - 8));
+    SetWindowPos(popup, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
+bool showAutomationContextMenu(const TrayModel::Item &requested, int anchorX, int anchorY)
+{
+    const auto before = visibleWindows();
+    auto result = false;
+    if (requested.automationElement) result = invokeAutomationContextMenu(requested.automationElement);
+    if (!result) {
+        const auto shell = realTrayWindow();
+        const auto restoreTaskbar = shell && !IsWindowVisible(shell);
+        if (restoreTaskbar) {
+            ShowWindow(shell, SW_SHOW);
+            Sleep(150);
         }
-        if (nearest != current.cend() && nearestDistance <= 32 * 32) found = nearest;
+        auto current = automationTrayItems();
+        auto found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && candidate.key == requested.key; });
+        if (found == current.cend() && !requested.tooltip.isEmpty()) {
+            found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && trayTextMatches(candidate.tooltip, requested.tooltip); });
+        }
+        if (found == current.cend() && !requested.automationId.isEmpty()) {
+            found = std::find_if(current.cbegin(), current.cend(), [&requested](const TrayModel::Item &candidate) { return candidate.automationElement && candidate.automationId == requested.automationId && candidate.ordinal == requested.ordinal; });
+        }
+        if (found == current.cend() && requested.bounds.isValid()) {
+            const auto requestedCenter = requested.bounds.center();
+            auto nearest = current.cend();
+            qint64 nearestDistance = std::numeric_limits<qint64>::max();
+            for (auto candidate = current.cbegin(); candidate != current.cend(); ++candidate) {
+                if (!candidate->automationElement || !candidate->bounds.isValid()) continue;
+                const auto candidateCenter = candidate->bounds.center();
+                const auto deltaX = static_cast<qint64>(requestedCenter.x()) - candidateCenter.x();
+                const auto deltaY = static_cast<qint64>(requestedCenter.y()) - candidateCenter.y();
+                const auto distance = deltaX * deltaX + deltaY * deltaY;
+                if (distance < nearestDistance) { nearest = candidate; nearestDistance = distance; }
+            }
+            if (nearest != current.cend() && nearestDistance <= 32 * 32) found = nearest;
+        }
+        result = found != current.cend() ? invokeAutomationContextMenu(found->automationElement) : invokeAutomationContextMenu(requested.automationElement);
+        releaseAutomationItems(current);
+        if (restoreTaskbar && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
     }
-    const auto result = found != current.cend() ? invokeAutomationContextMenu(found->automationElement) : invokeAutomationContextMenu(requested.automationElement);
-    releaseAutomationItems(current);
-    if (restoreTaskbar && IsWindow(shell)) ShowWindow(shell, SW_HIDE);
+    if (result) {
+        HWND popup = nullptr;
+        for (int attempt = 0; attempt < 20 && !popup; ++attempt) {
+            popup = findContextPopup(before);
+            if (!popup) Sleep(10);
+        }
+        if (popup) positionContextPopup(popup, POINT{ anchorX, anchorY });
+    }
     return result;
 }
 
@@ -1038,7 +1112,11 @@ void TrayModel::showContextMenu(const QString &key, int x, int y)
     const auto value = key.toULongLong(&ok);
     const auto found = std::find_if(items.cbegin(), items.cend(), [value](const Item &item) { return item.key == value; });
     if (!ok || found == items.cend()) return;
-    if (showAutomationContextMenu(*found)) return;
+    POINT anchor{ x, y };
+    GetCursorPos(&anchor);
+    if (showAutomationContextMenu(*found, anchor.x, anchor.y)) return;
+    x = anchor.x;
+    y = anchor.y;
     if (!found->owner || !found->callback) return;
     const auto owner = reinterpret_cast<HWND>(static_cast<quintptr>(found->owner));
     if (!IsWindow(owner)) return;
@@ -1072,7 +1150,9 @@ void TrayModel::activate(const QString &key, int action)
     const auto found = std::find_if(items.cbegin(), items.cend(), [value](const Item &item) { return item.key == value; });
     if (!ok || found == items.cend()) return;
     if (action == 1) {
-        if (showAutomationContextMenu(*found)) return;
+        POINT anchor{};
+        GetCursorPos(&anchor);
+        if (showAutomationContextMenu(*found, anchor.x, anchor.y)) return;
     } else if (found->automationElement && (action == 3 || invokeAutomationItem(found->automationElement))) {
         return;
     }
