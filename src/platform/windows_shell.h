@@ -115,6 +115,7 @@ private:
     mutable QReadWriteLock iconImageLock;
     QHash<qulonglong, QImage> iconImages;
     quint64 imageRevision = 0;
+    bool wasDesktopLocked = false;
     QTimer timer;
 };
 
